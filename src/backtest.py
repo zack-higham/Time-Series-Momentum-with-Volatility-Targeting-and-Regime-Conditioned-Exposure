@@ -19,7 +19,9 @@ costs are cost_bps per unit of notional traded, deducted on the trade day.
 The first trade (building the book from zero) is charged like any other, on
 the first day with P&L.
 Short positions pay an annual borrow fee on their notional, accrued on an
-actual/360 basis like the risk-free rate.
+actual/360 basis like the risk-free rate. Leverage pays a financing spread
+over the T-bill rate on borrowed cash, max(long notional - NAV, 0), also
+actual/360 (short sale proceeds are conservatively not used to fund longs).
 """
 
 from dataclasses import dataclass
@@ -33,14 +35,14 @@ class BacktestResult:
     excess_returns: pd.Series      # daily R_d (net of costs and borrow fees)
     weights: pd.DataFrame          # end-of-day weights after any trade
     turnover: pd.Series            # traded notional on each trade date
-    costs: pd.Series               # daily cost deduction (trading + borrow)
+    costs: pd.Series               # daily cost deduction (trading + borrow + financing)
     rf: pd.Series                  # daily risk-free return used
 
 
 def run_backtest(target_weights: pd.DataFrame, daily_total_returns: pd.DataFrame,
                  rf: pd.Series, start: pd.Timestamp, end: pd.Timestamp,
                  cost_bps: float = 0.0, borrow_bps: float = 0.0,
-                 lag: int = 0) -> BacktestResult:
+                 lag: int = 0, financing_bps: float = 0.0) -> BacktestResult:
     """Simulate the portfolio from the first trade through `end`.
 
     target_weights: rows indexed by signal dates, columns = instruments.
@@ -75,6 +77,7 @@ def run_backtest(target_weights: pd.DataFrame, daily_total_returns: pd.DataFrame
     turnover = {}
     c = cost_bps / 1e4
     b = borrow_bps / 1e4
+    f = financing_bps / 1e4
 
     pending_cost = 0.0
     for d in range(n):
@@ -83,7 +86,8 @@ def run_backtest(target_weights: pd.DataFrame, daily_total_returns: pd.DataFrame
             if np.isnan(r[d][held]).any() or np.isnan(rf_v[d]):
                 raise ValueError(f"missing return for a held position on {sim_days[d].date()}")
             r_d = np.where(held, r[d], 0.0)
-            borrow = b * np.sum(np.clip(-w, 0, None)) * cal_days[d] / 360.0
+            borrow = (b * np.sum(np.clip(-w, 0, None))
+                      + f * max(np.sum(np.clip(w, 0, None)) - 1.0, 0.0)) * cal_days[d] / 360.0
             gross = np.dot(w, r_d - rf_v[d])
             # The cost of building the book at the first close is charged on
             # the first P&L day, so it falls inside the reported sample.

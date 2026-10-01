@@ -97,6 +97,18 @@ def test_borrow_fee_on_shorts():
     assert res.excess_returns.iloc[0] == pytest.approx(-2 * 0.0036 / 360)
 
 
+def test_financing_spread_on_borrowed_cash_only():
+    """Long 1.5 + long 0.7, short -0.4: borrowed cash = 2.2 - 1 = 1.2 (shorts
+    not netted). A 1x long book borrows nothing."""
+    rets = frame([[0, 0, 0], [0.0, 0, 0]], cols=("A", "B", "C"))
+    res = run_backtest(frame([[1.5, 0.7, -0.4]], cols=("A", "B", "C")), rets, zero_rf(),
+                       DAYS[0], DAYS[1], financing_bps=36)
+    assert res.excess_returns.iloc[0] == pytest.approx(-1.2 * 0.0036 / 360)
+    res1 = run_backtest(frame([[1.0, 0]]), frame([[0, 0], [0.0, 0]]), zero_rf(),
+                        DAYS[0], DAYS[1], financing_bps=36)
+    assert res1.excess_returns.iloc[0] == 0.0
+
+
 def test_missing_return_on_held_position_raises():
     rets = frame([[0, 0], [np.nan, 0]])
     with pytest.raises(ValueError):

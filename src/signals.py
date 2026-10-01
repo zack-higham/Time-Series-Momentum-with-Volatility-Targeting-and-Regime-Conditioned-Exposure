@@ -48,3 +48,31 @@ def all_signals(prices: pd.DataFrame) -> dict:
     signals["blend"] = pd.DataFrame(blend, index=signals[12].index,
                                     columns=signals[12].columns)
     return signals
+
+
+def continuous_tstat_signal(daily_excess: pd.DataFrame, dates: pd.DatetimeIndex,
+                            k: int = 12) -> pd.DataFrame:
+    """Robustness signal: s = clip(t / 2, -1, 1), with t the t-statistic of
+    the mean daily excess return over the k months ending at each date.
+
+    A continuous, risk-adjusted measure of trend strength in the spirit of
+    Baltas and Kosowski: a full position only when the trend is
+    statistically strong (|t| >= 2), a fractional one when it is weak. The
+    window is the trading days after the month-end k months earlier, up to
+    and including the date, so it covers the same period as the 12m sign
+    signal. Fixed before any result for it was computed.
+    """
+    ends = pd.DatetimeIndex(daily_excess.index.to_series()
+                            .groupby(daily_excess.index.to_period("M")).max().values)
+    rows = {}
+    for t in dates:
+        i = ends.get_loc(t)
+        if i < k:
+            continue
+        window = daily_excess.loc[ends[i - k]:t].iloc[1:]
+        n = window.notna().sum()
+        tstat = window.mean() / (window.std() / np.sqrt(n))
+        # Require (nearly) the full window, as the sign signal does.
+        tstat[n < 0.9 * 21 * k] = np.nan
+        rows[t] = (tstat / 2).clip(-1, 1)
+    return pd.DataFrame(rows).T.reindex(dates)

@@ -38,3 +38,55 @@ def summary(monthly: pd.Series, daily: pd.Series) -> dict:
         "hit_rate": (m > 0).mean(),
         "months": len(m),
     }
+
+
+def period_excess(daily_excess: pd.Series, rf: pd.Series, freq: str) -> pd.Series:
+    """Compound daily excess returns to calendar periods ("M" or "Q"):
+    prod(1 + rf + R) - prod(1 + rf), the same definition as monthly_excess."""
+    df = pd.DataFrame({"R": daily_excess, "rf": rf.reindex(daily_excess.index).fillna(0.0)}).dropna()
+    by = df.index.to_period(freq)
+    return (1 + df["rf"] + df["R"]).groupby(by).prod() - (1 + df["rf"]).groupby(by).prod()
+
+
+def lo_sharpe_se(monthly: pd.Series) -> float:
+    """Lo (2002) IID standard error of the annualised Sharpe ratio:
+    sqrt((1 + SR_m^2 / 2) / T) per month, times sqrt(12)."""
+    m = monthly.dropna()
+    sr = m.mean() / m.std()
+    return float(np.sqrt((1 + 0.5 * sr ** 2) / len(m)) * np.sqrt(12))
+
+
+def sortino(monthly: pd.Series) -> float:
+    """Annualised mean over annualised downside deviation (target 0)."""
+    m = monthly.dropna()
+    downside = np.sqrt(np.mean(np.minimum(m, 0.0) ** 2)) * np.sqrt(12)
+    return float(m.mean() * 12 / downside)
+
+
+def drawdown_episode(daily_excess: pd.Series) -> dict:
+    """Deepest drawdown: peak, trough, recovery dates and durations in months
+    (calendar days / 30.44). The longest underwater spell is also returned."""
+    wealth = (1 + daily_excess.dropna()).cumprod()
+    dd = wealth / wealth.cummax() - 1
+    trough = dd.idxmin()
+    peak = wealth.loc[:trough].idxmax()
+    after = dd.loc[trough:]
+    recovered = after[after >= 0]
+    recovery = recovered.index[0] if len(recovered) else None
+    # Longest spell between successive new highs (open spell runs to the end).
+    highs = dd.index[dd >= 0].append(pd.DatetimeIndex([dd.index[-1]]))
+    gaps = highs.to_series().diff().dt.days
+    return {"mdd_peak": peak.date(), "mdd_trough": trough.date(),
+            "mdd_recovery": recovery.date() if recovery is not None else None,
+            "mdd_peak_to_trough_m": (trough - peak).days / 30.44,
+            "mdd_underwater_m": ((recovery or dd.index[-1]) - peak).days / 30.44,
+            "longest_underwater_m": gaps.max() / 30.44}
+
+
+def moments(x: pd.Series) -> dict:
+    """Skewness and excess kurtosis with normal-theory standard errors,
+    sqrt(6/n) and sqrt(24/n) (understated for fat-tailed data)."""
+    x = x.dropna()
+    n = len(x)
+    return {"skew": x.skew(), "skew_se": np.sqrt(6 / n),
+            "exkurt": x.kurt(), "exkurt_se": np.sqrt(24 / n), "n": n}

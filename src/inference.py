@@ -71,3 +71,30 @@ def spanning_regression(y: pd.Series, factors: pd.DataFrame) -> dict:
         out[f"beta_{f}"] = fit.params[f]
         out[f"t_{f}"] = fit.tvalues[f]
     return out
+
+
+def deflated_sharpe_ratio(monthly: pd.Series, trial_sharpes_m: np.ndarray,
+                          n_trials: int | None = None) -> dict:
+    """Bailey and Lopez de Prado (2014) deflated Sharpe ratio.
+
+    Probability that the true Sharpe ratio exceeds SR0, the maximum Sharpe
+    expected from N independent trials with zero true Sharpe and the observed
+    cross-trial variance of Sharpe estimates. All Sharpe ratios are monthly
+    (non-annualised); skewness and kurtosis correct for non-normal returns.
+    n_trials overrides the count (e.g. an effective number of independent
+    trials) while keeping the observed cross-trial dispersion.
+    """
+    from scipy.stats import norm
+    m = monthly.dropna()
+    t = len(m)
+    sr = m.mean() / m.std()
+    g3, g4 = m.skew(), m.kurt() + 3
+    n = len(trial_sharpes_m) if n_trials is None else n_trials
+    euler = 0.5772156649
+    sd_trials = np.std(trial_sharpes_m, ddof=1)
+    sr0 = sd_trials * ((1 - euler) * norm.ppf(1 - 1 / n) + euler * norm.ppf(1 - 1 / (n * np.e)))
+    denom = np.sqrt(1 - g3 * sr + (g4 - 1) / 4 * sr ** 2)
+    z = (sr - sr0) * np.sqrt(t - 1) / denom
+    psr0 = norm.cdf(sr * np.sqrt(t - 1) / denom)   # probabilistic Sharpe vs 0, no deflation
+    return {"n_trials": n, "sr_ann": sr * np.sqrt(12), "sr0_ann": sr0 * np.sqrt(12),
+            "trial_sr_sd_ann": sd_trials * np.sqrt(12), "psr_vs_0": psr0, "dsr": norm.cdf(z)}

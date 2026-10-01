@@ -36,13 +36,18 @@ def raw_tsmom_weights(signal: pd.DataFrame, dates: pd.DatetimeIndex) -> pd.DataF
     return s.div(n, axis=0)
 
 
-def risk_budgets(allocation: str) -> pd.Series:
+def risk_budgets(allocation: str, exclude_class: str | None = None) -> pd.Series:
     """Share of ex-ante risk budget per instrument, summing to one.
 
     "asset_class": 25% per asset class, split equally within the class.
     "instrument":  1/N per instrument (MOP convention).
+    exclude_class drops one asset class (leave-one-out robustness); the
+    remaining classes share the budget equally.
     """
     classes = pd.Series(INSTRUMENTS)
+    if exclude_class is not None:
+        assert exclude_class in classes.values, f"unknown class {exclude_class!r}"
+        classes = classes[classes != exclude_class]
     if allocation == "asset_class":
         n_classes = classes.nunique()
         return 1.0 / (n_classes * classes.map(classes.value_counts()))
@@ -52,7 +57,7 @@ def risk_budgets(allocation: str) -> pd.Series:
 
 
 def inverse_vol_weights(signal: pd.DataFrame, vol: pd.DataFrame, dates: pd.DatetimeIndex,
-                        allocation: str) -> pd.DataFrame:
+                        allocation: str, exclude_class: str | None = None) -> pd.DataFrame:
     """Variant 2a: w_i = s_i * b_i * target / sigma_i.
 
     Each instrument's standalone ex-ante volatility is b_i x 10%, so the
@@ -60,7 +65,7 @@ def inverse_vol_weights(signal: pd.DataFrame, vol: pd.DataFrame, dates: pd.Datet
     lower because instruments are not perfectly correlated; 2a fixes the risk
     of each position, not of the portfolio.
     """
-    b = risk_budgets(allocation)
+    b = risk_budgets(allocation, exclude_class)
     s = signal.loc[dates, b.index]
     sig = vol.loc[dates, b.index]
     return s * b * PORTFOLIO_VOL_TARGET / sig
@@ -100,3 +105,10 @@ def risk_contributions(weights: pd.DataFrame, daily_excess: pd.DataFrame,
         total = w.values @ marginal
         rows[date] = w.values * marginal / total if total > 0 else np.zeros(len(w))
     return pd.DataFrame(rows, index=weights.columns).T
+
+
+def cap_gross_leverage(weights: pd.DataFrame, cap: float) -> pd.DataFrame:
+    """Scale down, pro rata, any date whose gross exposure sum |w_i| exceeds cap."""
+    gross = weights.abs().sum(axis=1)
+    factor = (cap / gross).clip(upper=1.0).where(gross > 0, 1.0)
+    return weights.mul(factor, axis=0)
