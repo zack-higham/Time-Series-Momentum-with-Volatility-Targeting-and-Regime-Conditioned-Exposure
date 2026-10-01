@@ -130,7 +130,12 @@ def summarise_main_sample(adj, trading_days):
     stats = pd.DataFrame({
         "class": pd.Series(INSTRUMENTS),
         "ann_excess_ret_pct": monthly_ex.mean() * 12 * 100,
-        "ann_vol_pct": excess.std() * np.sqrt(252) * 100,
+        # Mean, volatility and Sharpe all from monthly returns, so Sharpe =
+        # return / vol within the table. Daily-annualised vol is reported
+        # separately: for equities it is higher (negative daily autocorrelation
+        # in 2008-09), and mixing the two makes a table look inconsistent.
+        "ann_vol_pct": monthly_ex.std() * np.sqrt(12) * 100,
+        "ann_vol_daily_pct": excess.std() * np.sqrt(252) * 100,
         "sharpe": monthly_ex.mean() / monthly_ex.std() * np.sqrt(12),
         "skew_monthly": monthly_ex.skew(),
         "worst_month_pct": monthly_ex.min() * 100,
