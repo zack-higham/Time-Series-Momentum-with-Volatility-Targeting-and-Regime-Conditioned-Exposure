@@ -61,8 +61,14 @@ VOL_MIN_OBS = 120           # daily observations before an estimate is used
 CORR_WINDOW_DAYS = 252      # trailing window for the correlation matrix
 CORR_MIN_OBS = 126
 PORTFOLIO_VOL_TARGET = 0.10  # annualised, ex ante
-# Instrument level: equal ex-ante risk per instrument (MOP convention).
-# Robustness: equal risk per asset class.
+# Risk allocation: equal ex-ante risk per ASSET CLASS (25% each), split equally
+# across the instruments within a class. Within-class correlations are high
+# (equity ~1.3 and rates ~1.1 effective bets), so equal risk per instrument
+# would hand a cluster of near-duplicates a multiple of its diversification
+# value. Revised from per-instrument before any result was computed.
+# Robustness: equal risk per instrument (MOP convention; AQR factor comparison).
+RISK_ALLOCATION = "asset_class"
+RISK_ALLOCATION_SENSITIVITY = ("instrument",)
 GROSS_LEVERAGE_CAP = None    # primary: uncapped, leverage reported
 LEVERAGE_CAP_SENSITIVITY = (2.0, 3.0)
 
