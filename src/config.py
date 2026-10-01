@@ -84,6 +84,15 @@ EXECUTION_LAG_SENSITIVITY = (1,)
 COST_BPS = 10.0                           # per unit of notional traded, one way
 COST_SENSITIVITY_BPS = (0, 2, 5, 10, 20, 50)
 BORROW_FEE_SENSITIVITY_BPS = (0, 50, 100)  # per year on short notional
+# Added 2026-10-01 after Stage 4, before any of its results were computed:
+# leverage above 1x NAV must be financed, and a broker charges more than the
+# T-bill rate. Spread per year over rf on borrowed cash, where borrowed cash =
+# max(long notional - NAV, 0) (short sale proceeds conservatively not used
+# to fund longs).
+FINANCING_SPREAD_SENSITIVITY_BPS = (0, 50, 100)
+# Every robustness variant also reports its volatility bias statistic
+# (std of monthly return / ex-ante monthly vol), so the effect of each
+# estimator choice on risk-forecast accuracy is visible, not only on Sharpe.
 
 # --- Regime layer -------------------------------------------------------------
 # Primary (R1, "trend state"): 2-state Gaussian Markov-switching model with
