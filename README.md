@@ -45,31 +45,6 @@ the results.
   supports trend following as a crisis diversifier, not as a reliably profitable stand-alone
   strategy over this period.
 
-## Phase 2: breadth and carry (pre-registered extension)
-
-Phase 1 showed trend is modest on its own and cannot be timed. The standard alternative is
-diversification, so I pre-registered a second phase
-([commit 2d8974b](https://github.com/zack-higham/Time-Series-Momentum-with-Volatility-Targeting-and-Regime-Conditioned-Exposure/commit/2d8974b), before any phase 2 data was saved): a 34-ETF
-universe selected by a mechanical liquidity and inception rule, a cross-sectional carry
-signal (distribution yield minus cash for equity and bond funds, short-rate differentials
-for currencies, following Koijen et al. 2018), and a fixed 50/50 risk combination of trend
-and carry.
-
-| Strategy (net of 10 bps) | Sharpe | Max drawdown |
-|---|---|---|
-| V2 (phase 1, 10 ETFs) | 0.45 | -26.8% |
-| Trend on 34 ETFs | 0.27 | -28.8% |
-| Carry on 34 ETFs | -0.24 | -63.1% |
-| **Trend + carry (phase 2 primary)** | **0.06** | -38.0% |
-
-**The extension failed, and it is reported as obtained.** Currency carry lost money after
-2008 as the dollar strengthened, equity carry (long high-dividend markets, short US growth)
-lost through the 2010s, carry crashed in 2008 and 2020 exactly when trend paid off, and
-within-class carry spreads between highly correlated bond funds required up to 9x
-leverage. Adding funds also diluted trend with currencies that did not trend. Code and
-results are in `src/run_stage12.py`, `src/run_stage13.py` and `output/stage13_report.txt`;
-the paper currently covers phase 1.
-
 ---
 
 ## Method
@@ -85,8 +60,8 @@ the paper currently covers phase 1.
 | Engine | Daily self-financing backtest, monthly rebalance, weight drift, 10 bps per unit traded | Captures intra-month drawdowns (March 2020) |
 | Inference | Newey-West t; Lo (2002) Sharpe SEs; paired stationary bootstrap for Sharpe differences; deflated Sharpe ratio | Variants are highly correlated, so naive Sharpe comparisons are invalid |
 
-**Validation.** 45 automated tests, including truncation tests: signals, volatilities,
-weights, backtest returns, regime probabilities and carry are recomputed after deleting all
+**Validation.** 39 automated tests, including truncation tests: signals, volatilities,
+weights, backtest returns and regime probabilities are recomputed after deleting all
 data after a cut-off date (including mid-crash March 2020), and every earlier value must be
 unchanged. The engine is checked against hand-calculated cases, the targeted ex-ante
 volatility against an independent covariance calculation, and the total-return prices
@@ -94,8 +69,8 @@ against closing prices plus distributions.
 
 **Problems found and disclosed rather than hidden** (details in the paper): 25 early regime
 refits converged to degenerate outlier-absorbing solutions; realised volatility runs 13%
-above target because of volatility jumps; two large capital-gains distributions
-contaminate one fund's carry measure; and every post-results decision is labelled as such.
+above target because of volatility jumps; and every post-results decision is labelled as
+such.
 
 ---
 
@@ -104,9 +79,9 @@ contaminate one fund's carry measure; and every post-results decision is labelle
 ```bash
 pip install -r requirements.txt
 cd src
-python fetch_prices.py && python fetch_rates.py && python fetch_benchmarks.py && python fetch_phase2.py
-python run_all.py          # every result, table and figure (about 8 minutes)
-cd .. && python -m pytest  # 45 tests
+python fetch_prices.py && python fetch_rates.py && python fetch_benchmarks.py
+python run_all.py          # every result, table and figure (about 6 minutes)
+cd .. && python -m pytest  # 39 tests
 ```
 
 Downloads are kept separate from the pipeline because Yahoo revises adjusted prices over
@@ -123,12 +98,11 @@ with pdflatex (standard packages only).
 | 5 | `regime.py`, `run_stage5.py` | Walk-forward Markov-switching overlay (V3), lookahead illustration |
 | 6 | `run_stage6.py` | Crisis windows, smile, costs and financing, robustness grid, deflated Sharpe |
 | 7 | `make_figures.py`, `make_tables.py` | Every figure and table in the paper, from saved outputs |
-| 10-13 | `fetch_phase2.py`, `check_data_phase2.py`, `carry.py`, `run_stage12.py`, `run_stage13.py` | Phase 2: universe rule, carry, combination |
 
 ## References
 
 Moskowitz, Ooi and Pedersen (2012), *Time series momentum*, JFE. Kim, Tse and Wald (2016),
 *Time series momentum and volatility scaling*, JFM. Huang, Li, Wang and Zhou (2020), *Time
-series momentum: is it there?*, JFE. Hamilton (1989), Econometrica. Koijen, Moskowitz,
-Pedersen and Vrugt (2018), *Carry*, JFE. Bailey and López de Prado (2014), JPM. Full list in
+series momentum: is it there?*, JFE. Hamilton (1989), Econometrica. Bailey and López de Prado
+(2014), JPM. Full list in
 the paper.

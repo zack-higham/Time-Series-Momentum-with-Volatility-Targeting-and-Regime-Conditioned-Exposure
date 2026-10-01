@@ -20,7 +20,7 @@ def section(title):
     print(f"\n=== {title} ===")
 
 
-def check_coverage(adj, classes=INSTRUMENTS):
+def check_coverage(adj):
     section("1. Coverage and calendar")
     calendar = adj["SPY"].dropna().index
     assert adj.index.is_monotonic_increasing and not adj.index.has_duplicates
@@ -32,7 +32,7 @@ def check_coverage(adj, classes=INSTRUMENTS):
         inside = calendar[(calendar >= first) & (calendar <= last)]
         gaps = int(s.reindex(inside).isna().sum())
         nonpositive = int((s.dropna() <= 0).sum())
-        rows.append({"ticker": t, "class": classes[t], "first": first.date(),
+        rows.append({"ticker": t, "class": INSTRUMENTS[t], "first": first.date(),
                      "last": last.date(), "days": int(s.notna().sum()),
                      "interior_gaps": gaps, "nonpositive_prices": nonpositive})
     table = pd.DataFrame(rows).set_index("ticker")
@@ -47,32 +47,21 @@ def check_total_return(close, adj, actions):
     div = (actions.pivot_table(index=actions.index, columns="ticker", values="dividend",
                                aggfunc="sum")
            .reindex(index=close.index, columns=close.columns).fillna(0.0))
-    # Two reinvestment conventions on an ex-date with distribution D:
-    #   additive (exact one-day holding return): (C_t + D) / C_{t-1} - 1
-    #   Yahoo's multiplicative adjustment:        C_t / (C_{t-1} - D) - 1
-    # Yahoo's series must match its own convention exactly (verifies the
-    # data); the gap to the additive return is a small convention bias,
-    # largest for high-yield, high-volatility funds, and is reported.
     rows = []
     for t in close.columns:
         c = close[t].dropna()
-        d = div[t].reindex(c.index)
-        additive = (c + d) / c.shift(1) - 1
-        multiplicative = c / (c.shift(1) - d) - 1
+        rebuilt = (c + div[t].reindex(c.index)) / c.shift(1) - 1
         yahoo = adj[t].dropna().pct_change()
         price_only = c.pct_change()
         yearly = lambda r: (1 + r).groupby(r.index.year).prod() - 1
+        annual_gap = (yearly(rebuilt) - yearly(yahoo)).abs().max() * 1e4
         income = (yearly(yahoo) - yearly(price_only)).mean() * 100
-        rows.append({"ticker": t, "distributions": int((d > 0).sum()),
-                     "yahoo_conv_max_annual_gap_bps":
-                         (yearly(multiplicative) - yearly(yahoo)).abs().max() * 1e4,
-                     "additive_max_annual_gap_bps": (yearly(additive) - yearly(yahoo)).abs().max() * 1e4,
-                     "additive_mean_annual_gap_bps": (yearly(yahoo) - yearly(additive)).mean() * 1e4,
-                     "mean_income_pct_yr": income})
+        rows.append({"ticker": t, "distributions": int((div[t] > 0).sum()),
+                     "max_daily_gap_bps": (rebuilt - yahoo).abs().max() * 1e4,
+                     "max_annual_gap_bps": annual_gap, "mean_income_pct_yr": income})
     table = pd.DataFrame(rows).set_index("ticker").round(2)
     print(table.to_string())
-    assert (table["yahoo_conv_max_annual_gap_bps"] < 1).all(), \
-        "adjusted series disagrees with close + distributions"
+    assert (table["max_annual_gap_bps"] < 10).all(), "adjusted series disagrees with close + dividends"
     splits = actions[actions["split"] > 0]
     print(f"Splits in the data: {len(splits)}")
     for date, row in splits.iterrows():

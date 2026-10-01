@@ -25,16 +25,6 @@ def load_prices() -> pd.DataFrame:
     return load_frame("adj_close").loc[:SAMPLE_END, list(INSTRUMENTS)]
 
 
-def load_prices_u2() -> pd.DataFrame:
-    """Phase 2 universe: the phase 1 files for the 10 core ETFs plus the 24
-    additions, on the same trading calendar, in config order."""
-    from config import UNIVERSE_U2
-    core = load_frame("adj_close").loc[:SAMPLE_END]
-    add = load_frame("u2add_adj_close").loc[:SAMPLE_END]
-    assert core.index.equals(add.index), "phase 1 and phase 2 calendars differ"
-    return pd.concat([core, add], axis=1)[list(UNIVERSE_U2)]
-
-
 def month_end_dates(trading_days: pd.DatetimeIndex) -> pd.DatetimeIndex:
     """Last trading day of each calendar month."""
     s = trading_days.to_series()

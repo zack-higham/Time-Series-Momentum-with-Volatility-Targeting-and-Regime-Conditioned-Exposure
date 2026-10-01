@@ -36,8 +36,7 @@ def raw_tsmom_weights(signal: pd.DataFrame, dates: pd.DatetimeIndex) -> pd.DataF
     return s.div(n, axis=0)
 
 
-def risk_budgets(allocation: str, exclude_class: str | None = None,
-                 classes: dict | None = None) -> pd.Series:
+def risk_budgets(allocation: str, exclude_class: str | None = None) -> pd.Series:
     """Share of ex-ante risk budget per instrument, summing to one.
 
     "asset_class": 25% per asset class, split equally within the class.
@@ -45,7 +44,7 @@ def risk_budgets(allocation: str, exclude_class: str | None = None,
     exclude_class drops one asset class (leave-one-out robustness); the
     remaining classes share the budget equally.
     """
-    classes = pd.Series(INSTRUMENTS if classes is None else classes)
+    classes = pd.Series(INSTRUMENTS)
     if exclude_class is not None:
         assert exclude_class in classes.values, f"unknown class {exclude_class!r}"
         classes = classes[classes != exclude_class]
@@ -58,8 +57,7 @@ def risk_budgets(allocation: str, exclude_class: str | None = None,
 
 
 def inverse_vol_weights(signal: pd.DataFrame, vol: pd.DataFrame, dates: pd.DatetimeIndex,
-                        allocation: str, exclude_class: str | None = None,
-                        classes: dict | None = None) -> pd.DataFrame:
+                        allocation: str, exclude_class: str | None = None) -> pd.DataFrame:
     """Variant 2a: w_i = s_i * b_i * target / sigma_i.
 
     Each instrument's standalone ex-ante volatility is b_i x 10%, so the
@@ -67,7 +65,7 @@ def inverse_vol_weights(signal: pd.DataFrame, vol: pd.DataFrame, dates: pd.Datet
     lower because instruments are not perfectly correlated; 2a fixes the risk
     of each position, not of the portfolio.
     """
-    b = risk_budgets(allocation, exclude_class, classes)
+    b = risk_budgets(allocation, exclude_class)
     s = signal.loc[dates, b.index]
     sig = vol.loc[dates, b.index]
     return s * b * PORTFOLIO_VOL_TARGET / sig
