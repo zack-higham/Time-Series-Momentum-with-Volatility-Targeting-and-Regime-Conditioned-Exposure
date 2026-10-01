@@ -1,0 +1,134 @@
+# Time-Series Momentum with Volatility Targeting and Regime-Conditioned Exposure
+
+Does a multi-asset time-series momentum (TSMOM) strategy, built only from liquid ETFs, earn
+a positive risk-adjusted return over 2008 to 2026? How much of its performance comes from
+the trend signal, from volatility targeting, and from a regime-conditioned exposure overlay?
+And does it deliver "crisis alpha" when equities fall?
+
+I implement the strategy of Moskowitz, Ooi and Pedersen (2012) on ten ETFs across equities,
+Treasuries, commodities and currencies, over 222 months (April 2008 to September 2026), and
+decompose it layer by layer. **Every design parameter was committed to version control
+before the first backtest was run**, so the git history documents that nothing was tuned to
+the results.
+
+**Full paper:** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf)
+(24 pages; LaTeX source in [`paper/main.tex`](paper/main.tex))
+
+---
+
+## Key findings
+
+| Strategy (net of 10 bps) | Ann. excess return | Volatility | Sharpe (Lo SE) | Max drawdown | Monthly skew |
+|---|---|---|---|---|---|
+| V1: raw TSMOM, equal notional | 1.79% | 7.0% | 0.26 (0.23) | -25.8% | -0.50 |
+| **V2: inverse-vol + 10% portfolio vol target** | **5.07%** | **11.3%** | **0.45 (0.23)** | **-26.8%** | **+0.33** |
+| V3: V2 + walk-forward regime overlay | 5.17% | 13.1% | 0.39 (0.23) | -26.3% | +0.40 |
+| Long-only risk parity (same construction, all long) | 3.19% | 11.0% | 0.29 (0.23) | -30.1% | -0.35 |
+| SPY / 60-40 (gross) | 11.18% / 7.15% | 15.6% / 9.7% | 0.72 / 0.74 | -51.8% / -32.3% | -0.58 / -0.62 |
+
+- **Volatility targeting is the layer that matters.** It raises the Sharpe ratio from 0.26 to
+  0.45 and turns monthly skewness from negative to positive (the signature of trend
+  following), but the improvement is not statistically significant (paired stationary
+  bootstrap p = 0.19).
+- **Crisis alpha.** V2 gained 9.2%, 12.6% and 30.6% over the three largest equity drawdowns
+  of the sample (2008 to 2009, 2020, 2022) while SPY fell 52%, 34% and 25%, and averaged
+  +1.8% in SPY's worst decile of months.
+- **The ETF implementation is the real strategy:** correlation 0.77 with the AQR futures
+  TSMOM factor (beta 0.66, R² 0.60, insignificant alpha).
+- **Timing trend with a regime model does not work.** Three walk-forward Markov-switching
+  overlays lower the Sharpe ratio by 0.02 to 0.13. The model's "trending" state is a
+  low-volatility state with no forecasting power. Using full-sample smoothed probabilities
+  instead would have reported a spurious +0.12 Sharpe gain: a demonstration of how a common
+  lookahead error flatters regime models.
+- **Honest significance.** After deflating for the 25 configurations examined (Bailey and
+  López de Prado 2014), V2's Sharpe ratio is not significant at 5% (DSR 0.68). The evidence
+  supports trend following as a crisis diversifier, not as a reliably profitable stand-alone
+  strategy over this period.
+
+## Phase 2: breadth and carry (pre-registered extension)
+
+Phase 1 showed trend is modest on its own and cannot be timed. The standard alternative is
+diversification, so I pre-registered a second phase
+([commit 2d8974b](https://github.com/zack-higham/Time-Series-Momentum-with-Volatility-Targeting-and-Regime-Conditioned-Exposure/commit/2d8974b), before any phase 2 data was saved): a 34-ETF
+universe selected by a mechanical liquidity and inception rule, a cross-sectional carry
+signal (distribution yield minus cash for equity and bond funds, short-rate differentials
+for currencies, following Koijen et al. 2018), and a fixed 50/50 risk combination of trend
+and carry.
+
+| Strategy (net of 10 bps) | Sharpe | Max drawdown |
+|---|---|---|
+| V2 (phase 1, 10 ETFs) | 0.45 | -26.8% |
+| Trend on 34 ETFs | 0.27 | -28.8% |
+| Carry on 34 ETFs | -0.24 | -63.1% |
+| **Trend + carry (phase 2 primary)** | **0.06** | -38.0% |
+
+**The extension failed, and it is reported as obtained.** Currency carry lost money after
+2008 as the dollar strengthened, equity carry (long high-dividend markets, short US growth)
+lost through the 2010s, carry crashed in 2008 and 2020 exactly when trend paid off, and
+within-class carry spreads between highly correlated bond funds required up to 9x
+leverage. Adding funds also diluted trend with currencies that did not trend. Code and
+results are in `src/run_stage12.py`, `src/run_stage13.py` and `output/stage13_report.txt`;
+the paper currently covers phase 1.
+
+---
+
+## Method
+
+| Component | Choice | Why |
+|---|---|---|
+| Universe | SPY, EFA, EEM; IEF, TLT; GLD, DBC; UUP, FXY, FXA | Four asset classes; FX uses three different exposures rather than near-duplicates |
+| Returns | Daily total returns minus the T-bill rate (^IRX, actual/360) | ETFs are funded; futures (the literature's setting) earn excess returns |
+| Signal | Sign of trailing 12-month excess return (1/3/6 months and a blend reported) | MOP headline, fixed in advance |
+| Volatility | EWMA of daily excess returns, centre of mass 60 days | MOP ex-ante estimator |
+| Risk allocation | Equal ex-ante risk per asset class, then 10% portfolio vol target with trailing correlations | Within-class correlations are high (equities 1.26, rates 1.08 effective bets) |
+| Regime overlay | 2-state Markov-switching model on the weekly trend payoff, refitted monthly, **filtered** probabilities only | Measures "is trend paying" directly; smoothed probabilities use future data |
+| Engine | Daily self-financing backtest, monthly rebalance, weight drift, 10 bps per unit traded | Captures intra-month drawdowns (March 2020) |
+| Inference | Newey-West t; Lo (2002) Sharpe SEs; paired stationary bootstrap for Sharpe differences; deflated Sharpe ratio | Variants are highly correlated, so naive Sharpe comparisons are invalid |
+
+**Validation.** 45 automated tests, including truncation tests: signals, volatilities,
+weights, backtest returns, regime probabilities and carry are recomputed after deleting all
+data after a cut-off date (including mid-crash March 2020), and every earlier value must be
+unchanged. The engine is checked against hand-calculated cases, the targeted ex-ante
+volatility against an independent covariance calculation, and the total-return prices
+against closing prices plus distributions.
+
+**Problems found and disclosed rather than hidden** (details in the paper): 25 early regime
+refits converged to degenerate outlier-absorbing solutions; realised volatility runs 13%
+above target because of volatility jumps; two large capital-gains distributions
+contaminate one fund's carry measure; and every post-results decision is labelled as such.
+
+---
+
+## Reproduce
+
+```bash
+pip install -r requirements.txt
+cd src
+python fetch_prices.py && python fetch_rates.py && python fetch_benchmarks.py && python fetch_phase2.py
+python run_all.py          # every result, table and figure (about 8 minutes)
+cd .. && python -m pytest  # 45 tests
+```
+
+Downloads are kept separate from the pipeline because Yahoo revises adjusted prices over
+time; everything downstream of `data/` is deterministic. Paper: compile `paper/main.tex`
+with pdflatex (standard packages only).
+
+| Stage | Script | What it does |
+|---|---|---|
+| 0 | `config.py` | Every parameter, committed before any result |
+| 1 | `fetch_*.py`, `check_data.py` | Prices, distributions, rates, AQR factors; coverage, total-return and extreme-move checks |
+| 2 | `run_stage2.py` | Excess returns, EWMA volatility, signals, pooled predictive regressions |
+| 3 | `backtest.py`, `run_stage3.py` | Daily engine, raw TSMOM (V1) |
+| 4 | `portfolio.py`, `run_stage4.py` | Volatility targeting (V2), benchmarks, spanning, AQR validation |
+| 5 | `regime.py`, `run_stage5.py` | Walk-forward Markov-switching overlay (V3), lookahead illustration |
+| 6 | `run_stage6.py` | Crisis windows, smile, costs and financing, robustness grid, deflated Sharpe |
+| 7 | `make_figures.py`, `make_tables.py` | Every figure and table in the paper, from saved outputs |
+| 10-13 | `fetch_phase2.py`, `check_data_phase2.py`, `carry.py`, `run_stage12.py`, `run_stage13.py` | Phase 2: universe rule, carry, combination |
+
+## References
+
+Moskowitz, Ooi and Pedersen (2012), *Time series momentum*, JFE. Kim, Tse and Wald (2016),
+*Time series momentum and volatility scaling*, JFM. Huang, Li, Wang and Zhou (2020), *Time
+series momentum: is it there?*, JFE. Hamilton (1989), Econometrica. Koijen, Moskowitz,
+Pedersen and Vrugt (2018), *Carry*, JFE. Bailey and López de Prado (2014), JPM. Full list in
+the paper.

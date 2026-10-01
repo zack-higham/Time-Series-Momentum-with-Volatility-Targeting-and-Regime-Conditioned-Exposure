@@ -306,7 +306,7 @@ def main():
     FIG_DIR.mkdir(parents=True, exist_ok=True)
 
     def save(fig, name):
-        fig.savefig(FIG_DIR / f"{name}.pdf")
+        fig.savefig(FIG_DIR / f"{name}.pdf", metadata={"CreationDate": None})   # byte-stable
         if args.png:
             args.png.mkdir(parents=True, exist_ok=True)
             fig.savefig(args.png / f"{name}.png", dpi=170)
