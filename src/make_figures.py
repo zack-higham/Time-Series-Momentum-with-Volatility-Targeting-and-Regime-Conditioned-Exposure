@@ -67,7 +67,7 @@ def end_labels(ax, series: dict, fmt="{:.2f}", min_gap=None):
     lo, hi = ax.get_ylim()
     log = ax.get_yscale() == "log"
     tr = (np.log10 if log else (lambda v: v))
-    gap = min_gap if min_gap is not None else 0.045 * (tr(hi) - tr(lo))
+    gap = min_gap if min_gap is not None else 0.06 * (tr(hi) - tr(lo))
     placed = []
     for v, k in items:
         y = tr(v)
@@ -131,7 +131,7 @@ def fig_crisis(save):
     picks = ["2008-05-19", "2020-02-19", "2022-01-03"]
     titles = ["(a) Global financial crisis", "(b) COVID-19 crash", "(c) 2022 inflation shock"]
     mdates = matplotlib.dates
-    ticks = [(mdates.MonthLocator(bymonth=(6, 9, 12, 3)), "%b %y"),
+    ticks = [(mdates.MonthLocator(bymonth=(9, 1)), "%b %y"),
              (mdates.WeekdayLocator(byweekday=mdates.MO, interval=2), "%d %b"),
              (mdates.MonthLocator(bymonth=(1, 5, 9)), "%b %y")]
     fig, axes = plt.subplots(1, 3, figsize=(WIDTH, 2.6), sharey=False)
@@ -295,7 +295,7 @@ def fig_costs(save):
     ax.axhline(0, color=AXIS, lw=0.6)
     ax.set_xlabel("One-way cost per unit of notional traded (bps)")
     ax.set_ylabel("Sharpe ratio (net)")
-    ax.legend(loc="lower left")
+    ax.legend(loc="upper right")
     save(fig, "fig09_costs")
 
 

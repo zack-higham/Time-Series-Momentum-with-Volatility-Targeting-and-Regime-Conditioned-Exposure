@@ -21,6 +21,9 @@ NAME = {"V1": "V1 raw TSMOM", "V2a": "V2a inverse-vol", "V2": "V2 vol-targeted",
         "LO_RP": "Long-only risk parity", "SPY": "SPY", "60/40": "60/40", "V2_inst": "V2 per-instrument"}
 
 
+SHORT = {"V3_R2": "V3-R2", "LO_RP": "LO-RP"}   # compact labels for the widest table
+
+
 def csv(name, **kw):
     return pd.read_csv(OUTPUT_DIR / f"{name}.csv", **kw)
 
@@ -99,16 +102,16 @@ def tab_performance():
     rows = []
     for n in order:
         r = m.loc[n]
-        rows.append([NAME[n], num(r.ann_ret_pct), num(r.ann_vol_pct), num(r.sharpe),
+        rows.append([SHORT.get(n, n), num(r.ann_ret_pct), num(r.ann_vol_pct), num(r.sharpe),
                      f"({num(r.sharpe_se_lo)})", num(r.nw_t), num(r.sortino), num(r.max_dd_pct, 1),
-                     num(r.calmar), num(r.skew_m), num(r.skew_q), num(r.turnover_yr, 1),
-                     num(r.gross_lev_mean)])
+                     num(r.calmar), num(r.skew_d), num(r.skew_m), num(r.skew_q),
+                     num(r.turnover_yr, 1), num(r.gross_lev_mean)])
     write("tab04_performance", tabular(
-        "lrrrrrrrrrrrr",
+        "lrrrrrrrrrrrrr",
         [["", "Mean", "Vol", "Sharpe", "(SE)", "NW $t$", "Sortino", "MDD", "Calmar",
-          "Skew$_m$", "Skew$_q$", "Turn.", "Lev."]],
-        rows, groups={0: "\\multicolumn{13}{l}{\\textit{Trend strategies}} \\\\",
-                      5: "\\multicolumn{13}{l}{\\textit{Benchmarks}} \\\\"}))
+          "Skew$_d$", "Skew$_m$", "Skew$_q$", "Turn.", "Lev."]],
+        rows, groups={0: "\\multicolumn{14}{l}{\\textit{Trend strategies}} \\\\",
+                      5: "\\multicolumn{14}{l}{\\textit{Benchmarks}} \\\\"}))
 
 
 def tab_sharpe_tests():
@@ -266,7 +269,37 @@ def tab_costs():
                     ["", "None", "50", "100", "50", "100", "100"]], rows))
 
 
+def tab_risk():
+    v = csv("stage4_vol_validation", index_col=0)
+    rows = [[NAME[n], num(r.mean_ex_ante_pct), num(r.realised_pct), num(r.bias_stat),
+             str(int(r.months_abs_z_gt_2)), str(int(r.months_abs_z_gt_3))] for n, r in v.iterrows()]
+    write("tab14_vol_validation", tabular(
+        "lrrrrr", [["", "Ex-ante vol (\\%)", "Realised vol (\\%)", "Bias statistic",
+                    "Months $|z|>2$", "Months $|z|>3$"]], rows))
+    rc = csv("stage4_risk_contributions", index_col=0)
+    lev = csv("stage4_leverage", index_col=0)["gross"]
+    rows = [[c] + [num(rc.loc[c, n] * 100, 1) for n in ("V1", "V2", "V2_inst")] for c in rc.index]
+    write("tab15_risk_shares", tabular(
+        "lrrr", [["Asset class", "V1", "V2", "V2 per-instrument"]], rows))
+    stats = [("Mean", lev.mean()), ("Median", lev.median()), ("5th percentile", lev.quantile(0.05)),
+             ("95th percentile", lev.quantile(0.95)), ("Maximum", lev.max())]
+    rows = [[k, num(x)] for k, x in stats] + [
+        ["Share of months above 2$\\times$", num((lev > 2).mean() * 100, 0, pct=True)],
+        ["Share of months above 3$\\times$", num((lev > 3).mean() * 100, 0, pct=True)]]
+    write("tab16_leverage", tabular("lr", [["V2 gross leverage at rebalance", "Value"]], rows))
+
+
+def tab_dsr():
+    d = csv("stage6_deflated_sharpe").iloc[0]
+    e = csv("stage6_dsr_sensitivity")
+    rows = [[str(int(r.n_trials)) + (" (all configurations)" if int(r.n_trials) == int(d.n_trials) else ""),
+             num(r.sr0_ann), num(r.dsr)] for r in e.itertuples()]
+    write("tab17_dsr", tabular("lrr", [["Number of trials $N$", "SR$_0$ (annual)", "DSR"]], rows))
+
+
 def main():
+    tab_dsr()
+    tab_risk()
     tab_data()
     tab_predictive()
     tab_performance()

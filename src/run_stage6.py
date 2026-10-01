@@ -354,6 +354,7 @@ def main():
     print("DSR sensitivity to the effective number of trials (cross-trial SR sd held fixed):")
     print(eff.round(3).to_string(index=False))
     save_output(pd.DataFrame([dsr]), "stage6_deflated_sharpe")
+    save_output(eff.set_index("n_trials"), "stage6_dsr_sensitivity")
     save_output(pd.Series(tr.columns, name="trial"), "stage6_trials")
 
 
