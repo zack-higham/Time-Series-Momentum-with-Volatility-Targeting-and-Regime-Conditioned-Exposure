@@ -1,0 +1,514 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{setspace}
+\usepackage[authoryear,round]{natbib}
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
+
+\captionsetup{font=small,labelfont=bf}
+\setstretch{1.12}
+\newcommand{\tabfit}[1]{\resizebox{\textwidth}{!}{\input{#1}}}
+
+\title{\textbf{Time-Series Momentum in a Ten-ETF Universe:\\
+Volatility Targeting, Regime-Conditioned Exposure and Crisis Performance, 2008 to 2026}}
+\author{Zack Higham\\[2pt]
+\small BSc Mathematics (Statistics, Financial and AI pathway), Queen Mary University of London}
+\date{October 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This paper implements the time-series momentum (TSMOM) strategy of \citet{moskowitz2012} on ten liquid exchange-traded funds spanning equities, government bonds, commodities and currencies, over 222 months from April 2008 to September 2026, and decomposes its performance into three layers: the trend signal, volatility targeting, and a regime-conditioned exposure overlay based on a walk-forward Markov-switching model. Every design parameter was committed to version control before any result was computed. The raw equal-notional strategy earns a Sharpe ratio of 0.26 net of costs. Scaling positions by inverse volatility and targeting 10\% ex-ante portfolio volatility raises the Sharpe ratio to 0.45 (Newey-West $t = 1.95$) and turns monthly skewness from $-0.50$ to $+0.33$, but the improvement over the raw strategy is not statistically significant (bootstrap $p = 0.19$). The volatility-targeted portfolio has the defining property of trend following: it gained 9.2\%, 12.6\% and 30.6\% over the three largest equity drawdowns of the sample (2008 to 2009, 2020 and 2022) while the S\&P 500 fell between 25\% and 52\%, and it averaged $+1.8\%$ in the worst decile of equity months. It is also highly correlated with the AQR futures TSMOM factor ($R^2 = 0.60$), which validates the ETF implementation. The regime overlay does not add value: three walk-forward versions lower the Sharpe ratio by 0.02 to 0.13, and the model's ``trending'' state does not forecast trend returns out of sample, whereas a version using full-sample smoothed probabilities would have reported a spurious gain of 0.12. After deflating for the 25 configurations examined, the primary strategy's Sharpe ratio is not significant at the 5\% level. The evidence supports trend following as a diversifier with positive crisis convexity, not as a reliably profitable stand-alone strategy over this sample.
+\end{abstract}
+
+\section{Introduction}
+
+Time-series momentum is the tendency of an asset's own past return to predict its future return. \citet{moskowitz2012} (MOP) document it across 58 futures contracts from 1985 to 2009: a portfolio that is long each contract whose trailing twelve-month excess return is positive and short each contract whose return is negative earns a large and persistent premium, with its strongest returns in extreme market moves. \citet{hurst2017} extend the evidence back over a century. Trend following of this kind is the core business of managed-futures funds, and its central selling point is ``crisis alpha'': positive returns during prolonged equity sell-offs, when diversification is most valuable \citep{fung2001}.
+
+Two refinements are standard in practice. The first is volatility targeting: positions are scaled inversely to their ex-ante volatility so that each contributes comparable risk, and the whole portfolio is scaled to a constant volatility target. MOP use the first step; \citet{kim2016} argue that much of the TSMOM premium is in fact a volatility-scaling effect, and \citet{moreira2017} and \citet{harvey2018} study volatility management more broadly. The second refinement is regime conditioning: varying exposure according to an estimated market state, in the spirit of the regime-switching models of \citet{hamilton1989} and \citet{ang2002}. The premise is that trend strategies earn their returns in persistent ``trending'' regimes and lose in choppy, mean-reverting ones.
+
+This paper asks four questions about a TSMOM strategy built only from liquid ETFs over 2008 to 2026, a period widely regarded as difficult for trend followers. Does the strategy earn a positive risk-adjusted return? How much of its performance comes from the signal, from volatility targeting, and from a regime overlay? Does it deliver crisis alpha in the sample's equity drawdowns? And how robust is any of this to implementation choices, costs and multiple testing?
+
+The design is deliberately conservative. Every parameter (universe, sample, signal horizon, volatility estimator, risk allocation, cost assumption and regime model) was fixed in a configuration file and committed to version control before the first backtest was run, so the repository history documents that nothing was tuned to the results. The primary results are reported for these settings; alternatives appear only as labelled robustness checks. Where a decision had to be made after results were seen, it is identified as such.
+
+The main findings are as follows. Predictability at the instrument level is weak: none of the pooled regressions of returns on lagged signals is significant at 5\%. The traded portfolio nonetheless earns a positive return, and volatility targeting is the layer that matters: it raises the Sharpe ratio from 0.26 to 0.45 and turns negative skewness positive, although the gain is not statistically significant. The volatility-targeted strategy gained in each of the three largest equity drawdowns and tracks the AQR futures TSMOM factor closely. The regime overlay, by contrast, adds nothing out of sample, and a smoothed-probability version of the same overlay shows how easily a lookahead error would have suggested otherwise. Once the number of configurations examined is taken into account, the primary Sharpe ratio is not distinguishable from what selection alone could produce. The contribution is a transparent, reproducible decomposition that separates what the data support from what sampling variation and research design could manufacture.
+
+\section{Data}
+\label{sec:data}
+
+\textbf{Universe.} The universe is ten U.S.-listed ETFs in four asset classes: equities (SPY, S\&P 500; EFA, developed markets excluding North America; EEM, emerging markets), U.S.\ Treasuries (IEF, 7 to 10 years; TLT, 20 years and over), commodities (GLD, physical gold; DBC, a diversified commodity futures basket) and currencies (UUP, long the U.S.\ dollar against the DXY basket; FXY, long the yen; FXA, long the Australian dollar). The currency sleeve uses three differentiated exposures: the broad dollar, a safe-haven currency and a commodity-linked currency. A euro fund was rejected because the euro is about 58\% of the dollar index, making it close to a duplicate of UUP (daily correlation $-0.95$). Short-duration Treasuries were excluded because their volatility of about 1.5\% would require extreme leverage under volatility targeting, and single-commodity funds were excluded as redundant with DBC and GLD.
+
+\textbf{Prices.} Daily closing prices, dividend- and split-adjusted total-return prices, volume and every distribution and split were downloaded from Yahoo Finance from 2 January 2002 to 30 September 2026. The adjusted series was verified by rebuilding total returns from closing prices and distributions: the largest annual discrepancy across the ten funds is 6 basis points. The panel has no interior gaps and no non-positive prices, and every daily move larger than 8\% (49 in all) was matched to an identifiable market event, such as the 27 February 2007 Shanghai sell-off, the March 2020 crash and the 30 January 2026 fall in gold.
+
+\textbf{Risk-free rate and excess returns.} ETFs are fully funded, whereas the futures used in the TSMOM literature earn excess returns. Every return in this paper (in signals, volatility estimates and profit and loss) is therefore an excess return over the 13-week Treasury bill rate (Yahoo Finance \texttt{\^{}IRX}). The daily rate is the annualised yield known at the previous close, accrued over calendar days on an actual/360 basis. Compounded to months, it has a correlation of 0.991 with the Kenneth French one-month bill series. Subtracting the bill rate matters: in 2023 and 2024 cash earned about 5\% a year, and without it both the signals and the profit and loss of short positions would be misstated. Monthly excess returns are the month-end to month-end total return minus the compounded bill return over the same days.
+
+\textbf{Sample.} UUP begins trading in March 2007, so the first month-end at which all ten instruments have a twelve-month signal is 31 March 2008. The main sample is the 222 complete months from April 2008 to September 2026. Earlier data is used only for estimation warm-up and the regime model's training burn-in (Section~\ref{sec:regime_method}).
+
+\textbf{Benchmark data.} The AQR Time Series Momentum factor, constructed from futures and forwards across the same four asset classes following the MOP methodology, is used as an external benchmark. It ends in May 2026, so comparisons with it cover 218 months.
+
+Table~\ref{tab:data} summarises the instruments. SPY has the highest Sharpe ratio (0.72). The bond funds earned little in excess of cash over the sample (1.52\% a year for TLT and 1.12\% for IEF), because the 2022 sell-off reversed much of the earlier bond rally, and the yen lost 3.87\% a year against the dollar in excess-return terms. Table~\ref{tab:corr} reports monthly correlations. Within asset classes they are high (SPY and EFA 0.87, IEF and TLT 0.92), and the three currency funds are not independent (UUP and FXA $-0.78$). The effective number of independent bets within each class, measured by the eigenvalue participation ratio of its correlation matrix, is 1.26 for equities, 1.08 for rates, 1.87 for commodities and 1.93 for currencies. This motivates the risk allocation in Section~\ref{sec:vt}.
+
+\begin{table}[H]
+\centering
+\caption{Instruments, April 2008 to September 2026 (222 months). Annualised mean and volatility of monthly excess returns over the T-bill rate; Sharpe ratio is their ratio. Daily vol annualises daily excess returns with $\sqrt{252}$; it exceeds monthly volatility for every fund, and markedly for equities, because daily equity returns were negatively autocorrelated in the 2008 to 2009 crisis. Skewness and worst month are for monthly returns.}
+\label{tab:data}
+\small
+\input{tables/tab01_data}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Correlations of monthly excess returns, April 2008 to September 2026.}
+\label{tab:corr}
+\small
+\input{tables/tab02_correlations}
+\end{table}
+
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Timing convention}
+
+All signals and weights are computed from information available at the close of the last trading day of month $t$, and the resulting positions are held through month $t+1$. Trades execute at that same close, as in MOP; a one-day execution lag is reported as a robustness check. Between rebalances, positions drift with prices and the portfolio is marked to market daily, so that drawdowns inside a month (most importantly March 2020) are measured.
+
+\subsection{Signals}
+
+Let $r_{i,d}$ be the daily total return of instrument $i$ and $r^f_d$ the bill return. The $k$-month signal at month-end $t$ is the sign of the cumulative excess return over the preceding $k$ months,
+\begin{equation}
+s^{(k)}_{i,t} = \operatorname{sign}\!\left( \frac{P_{i,t}}{P_{i,t-k}} - \prod_{d \in (t-k,\,t]} \bigl(1 + r^f_d\bigr) \right),
+\end{equation}
+where $P_{i,t}$ is the total-return price at month-end $t$. Four horizons are tested, $k \in \{1, 3, 6, 12\}$, together with an equal-weighted blend of the four signs. The twelve-month signal is the primary specification, fixed in advance from MOP; the other horizons are reported so that the choice can be judged, not so that the best one can be chosen. Following MOP, no month is skipped: in time-series momentum the most recent month is part of the trend.
+
+\subsection{Ex-ante volatility}
+
+Volatility is the exponentially weighted estimator of MOP,
+\begin{equation}
+\sigma^2_{i,t} = 252 \sum_{j \ge 0} (1-\delta)\,\delta^{j} \bigl(x_{i,t-j} - \bar{x}_{i,t}\bigr)^2, \qquad \frac{\delta}{1-\delta} = 60,
+\end{equation}
+where $x_{i,d}$ is the daily excess return and $\bar{x}_{i,t}$ its exponentially weighted mean. The centre of mass is 60 trading days, at least 120 observations are required, and the estimate dated $t$ uses data up to and including the close of $t$. Portfolio risk uses these volatilities with the trailing 252-day correlation matrix of daily excess returns, $\Sigma_t = D_t C_t D_t$.
+
+\subsection{Strategy variants}
+\label{sec:vt}
+
+\textbf{V1: raw TSMOM.} Equal notional per instrument, $w_{i,t} = s_{i,t}/N$ with $N = 10$, so gross exposure is one.
+
+\textbf{V2a: inverse-volatility weighting.} Each instrument receives a share $b_i$ of a risk budget, and its position is scaled so that its stand-alone ex-ante volatility equals that share of the 10\% target $\sigma^* $:
+\begin{equation}
+w^{\mathrm{2a}}_{i,t} = s_{i,t}\, b_i\, \frac{\sigma^*}{\sigma_{i,t}}, \qquad b_i = \frac{1}{4\,n_{c(i)}},
+\end{equation}
+where $n_{c(i)}$ is the number of instruments in the asset class of $i$. The risk budget is thus split equally across the four asset classes and then equally within each class. Because instruments within a class are highly correlated (Section~\ref{sec:data}), equal risk per instrument (the MOP convention) would give the near-duplicate equity and Treasury funds a multiple of their diversification value; it is reported as a robustness check. This allocation was revised from equal risk per instrument before any result was computed.
+
+\textbf{V2: volatility targeting (primary).} V2a weights are rescaled so that the ex-ante volatility of the whole portfolio equals the target:
+\begin{equation}
+w^{\mathrm{2}}_{t} = \lambda_t\, w^{\mathrm{2a}}_{t}, \qquad \lambda_t = \frac{\sigma^*}{\sqrt{ w^{\mathrm{2a}\prime}_{t}\, \Sigma_t\, w^{\mathrm{2a}}_{t}}}.
+\end{equation}
+Leverage is not capped in the primary specification, mirroring the futures literature; caps of 2 and 3 times net asset value are robustness checks. The budgets fix stand-alone volatility, not risk contribution, so V2 is an inverse-volatility portfolio rather than an equal-risk-contribution portfolio, and correlated same-sign positions take more than their nominal share of risk (Table~\ref{tab:riskshares}).
+
+\textbf{Benchmarks.} Long-only risk parity (LO-RP) applies the V2 construction with every signal set to $+1$, so it isolates what TSMOM adds beyond holding the same risk-balanced, leveraged book long; \citet{huang2020} argue that much of the TSMOM premium is of this static kind. SPY and a monthly-rebalanced 60/40 portfolio of SPY and IEF are passive benchmarks, reported without costs.
+
+\subsection{Regime-conditioned exposure}
+\label{sec:regime_method}
+
+\textbf{Observation series.} The primary regime model (R1) is fitted to the weekly cross-asset trend payoff, which measures directly whether trend following is currently being rewarded. On each day $d$, every instrument with a twelve-month signal contributes its unit-risk TSMOM return $s_{i,m(d)}\, x_{i,d} / \sigma_{i,m(d)}$, where $m(d)$ is the latest month-end strictly before $d$ (the position actually held on day $d$). The daily payoff is the average over the available instruments, and the weekly payoff $y_w$ is its sum over the week. The alternative model (R2) is fitted to the weekly excess return of SPY, the textbook market-regime indicator, and tests the crisis-alpha thesis directly.
+
+\textbf{Model.} Each series follows a two-state Gaussian Markov-switching model \citep{hamilton1989} with state-dependent mean and variance,
+\begin{equation}
+y_w = \mu_{S_w} + \sigma_{S_w}\, \varepsilon_w, \qquad \varepsilon_w \sim \mathcal{N}(0,1), \qquad \Pr(S_w = j \mid S_{w-1} = i) = p_{ij},
+\end{equation}
+estimated by maximum likelihood with 20 random starting values, the best of which is kept.
+
+\textbf{Walk-forward estimation.} At every month-end $t$ the model is re-estimated on all weeks ending on or before $t$, and the regime signal is the \emph{filtered} probability $\Pr(S_w = j \mid y_1, \ldots, y_w)$ of the last such week. Filtered probabilities use only past and current observations. Smoothed probabilities, $\Pr(S_w = j \mid y_1, \ldots, y_T)$, condition on the whole sample and are never used for any reported result. Because state labels are arbitrary in estimation, they are re-identified at every refit: for R1 the target (``trending'') state is the one with the higher mean payoff; for R2 the target (``turbulent'') state is the one with the higher variance. At least 156 weeks are required. To have the overlay live for the 2008 crisis, the R1 model is trained from 2003 on whichever instruments already have signals, so the number of instruments in the payoff rises from two (SPY and EFA) in 2003 to all ten by April 2008. A version trained on main-sample weeks only, live from March 2011, is a robustness check.
+
+\textbf{Overlay.} Variant 3 scales the V2 weights by an exposure multiplier,
+\begin{equation}
+w^{\mathrm{3}}_{t} = (0.5 + p_t)\, w^{\mathrm{2}}_{t},
+\end{equation}
+where $p_t$ is the target-state probability at $t$, so exposure varies between half and one and a half times V2. The portfolio is not re-targeted after the multiplier, which would cancel it.
+
+\textbf{Lookahead illustration.} To quantify the bias that a common implementation error would create, the overlay is also computed from a single full-sample fit, using either its smoothed probabilities or its filtered probabilities. These variants use future data by construction; they are reported, clearly labelled, only as an illustration.
+
+\subsection{Backtest engine and costs}
+
+The backtest is a daily, self-financing simulation. With weights $w_{i,d-1}$ at the previous close, the portfolio's excess return on day $d$ is
+\begin{equation}
+R_d = \sum_i w_{i,d-1}\bigl(r_{i,d} - r^f_d\bigr) - c \sum_i \bigl| w^{\text{target}}_{i,d} - w_{i,d} \bigr| \mathbb{1}_{\text{trade}} - \text{fees}_d,
+\end{equation}
+and between trades the weights drift as $w_{i,d} = w_{i,d-1}(1 + r_{i,d})/(1 + r^f_d + R_d)$. Trading costs are $c = 10$ basis points per unit of notional traded, one way, with sensitivity from 0 to 50 basis points. This is conservative for these funds, whose quoted half-spreads are typically 1 to 5 basis points, but there is no market-impact model. Borrow fees on short positions and a financing spread over the bill rate on borrowed cash (long notional in excess of net asset value) are sensitivity analyses. Monthly returns compound the daily excess returns: $\prod_d (1 + r^f_d + R_d) - \prod_d (1 + r^f_d)$.
+
+\subsection{Statistical inference}
+
+Means are tested with Newey-West $t$-statistics using the automatic lag rule of \citet{newey1994}. Sharpe ratio standard errors follow \citet{lo2002}. Strategy variants built from the same signals are highly correlated, so comparing their Sharpe ratios as if they were independent is invalid; differences are instead tested by resampling each pair of monthly return series jointly with the stationary bootstrap of \citet{politis1994} (mean block length six months, 5,000 replications), in the spirit of \citet{ledoit2008}, with a two-sided $p$-value from the re-centred bootstrap distribution. Spanning regressions of a strategy on benchmark returns measure whether it earns a return beyond a static combination of them. The accuracy of the volatility forecast is measured by the bias statistic, the standard deviation of monthly returns divided by their ex-ante monthly volatility, which equals one for a correct forecast. Finally, the deflated Sharpe ratio of \citet{bailey2014} adjusts the primary Sharpe ratio for the number of configurations examined and for non-normal returns.
+
+\subsection{Validation of the implementation}
+
+The code base has 39 automated tests. Those most relevant to bias are truncation tests: signals, volatilities, portfolio weights, backtest returns and walk-forward regime probabilities are recomputed after deleting all data after a cut-off date (including dates in the middle of the March 2020 crash), and every value dated before the cut-off is required to be unchanged. The engine is checked against hand-calculated cases, the targeted portfolio's ex-ante volatility against an independent covariance calculation, and the gross V1 returns against the textbook formula $N^{-1}\sum_i s_{i,t-1} r_{i,t}$, which they match exactly.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{Predictability at the instrument level}
+
+Table~\ref{tab:predictive} reports pooled regressions of each instrument's volatility-scaled monthly excess return, $x_{i,t}/\sigma_{i,t-1}$, on its lagged signal, with standard errors clustered by month. The coefficients rise with the horizon, from $-0.001$ for the one-month signal to 0.016 for the twelve-month signal, the ordering found by MOP, but none is significant at 5\% (the twelve-month $t$-statistic is 1.66). With instrument fixed effects every $t$-statistic falls, to 1.02 for the twelve-month signal, because part of the pooled relation reflects differences in average returns across instruments rather than timing, the point made by \citet{huang2020}. Figure~\ref{fig:predictive} repeats MOP's lag-by-lag regressions: 2 of the 96 regressions (both at lag 8) exceed $|t| = 1.96$, fewer than the five that chance alone would produce. A decomposition of the twelve-month sign strategy's average return into a timing component and a static component (the product of average position and average return) attributes 56\% to timing. SPY is the exception, where the static long position in a rising market accounts for most of the profit.
+
+\begin{table}[H]
+\centering
+\caption{Pooled predictive regressions of the volatility-scaled monthly excess return on the lagged $k$-month signal, 2,220 instrument-months. Standard errors clustered by month.}
+\label{tab:predictive}
+\small
+\input{tables/tab03_predictive}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig05_predictive_tstats.pdf}
+\caption{Pooled regressions of the volatility-scaled return on its own value (a) and sign (b) at lag $h$ months. Horizontal lines mark $\pm 1.96$.}
+\label{fig:predictive}
+\end{figure}
+
+Weak instrument-level predictability is consistent with a shorter, later and narrower sample than MOP's: 10 instruments rather than 58, and a period after 2008 that includes the long, difficult stretch for trend followers in the 2010s. Pooled regressions also weight every instrument-month equally and have little power. Whether a diversified, risk-managed portfolio earns a reliable return is a separate question, addressed next.
+
+\subsection{The three layers of performance}
+
+Table~\ref{tab:perf} reports performance net of costs, and Figure~\ref{fig:cumulative} the cumulative returns. The raw strategy V1 earns 1.79\% a year with 7.01\% volatility, a Sharpe ratio of 0.26 (Newey-West $t = 1.05$). Inverse-volatility weighting (V2a) raises the Sharpe ratio to 0.36 at much lower volatility, and targeting 10\% portfolio volatility (V2) raises it to 0.45, with an annual excess return of 5.07\% and a Newey-West $t$-statistic of 1.95. Volatility targeting also changes the shape of the return distribution: V1's monthly skewness is $-0.50$, V2's is $+0.33$, and at a quarterly horizon V2's skewness is $+0.82$. Positive skewness is a signature of trend following, and it appears here only after volatility scaling. V1's negative skewness comes largely from 2009, when its equal-notional book was short equities into the March 2009 rebound, a classic momentum crash \citep{daniel2016}. Neither V1 nor V2 has positive skewness in daily returns, so the asymmetry builds over weeks rather than appearing in single days.
+
+\begin{table}[H]
+\centering
+\caption{Performance, April 2008 to September 2026 (222 months). Trend strategies and LO-RP are net of 10 bps costs; SPY and 60/40 are gross. Mean and Vol: annualised excess return and volatility (\%). Sharpe with Lo (2002) standard error. NW $t$: Newey-West $t$-statistic of the mean. MDD: maximum drawdown of the daily cumulative excess return (\%). Skewness of daily, monthly and quarterly returns (normal-theory standard errors 0.04, 0.16 and 0.29). Turn.: annual turnover (multiples of NAV). Lev.: mean gross leverage at rebalance.}
+\label{tab:perf}
+{\footnotesize\setlength{\tabcolsep}{3.2pt}\input{tables/tab04_performance}}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig01_cumulative.pdf}
+\caption{Growth of one unit invested in each strategy, in excess of T-bills (log scale). Panel (b) rescales each series ex post to 10\% realised volatility to compare return per unit of risk; the rescaling uses full-sample information and is not tradable.}
+\label{fig:cumulative}
+\end{figure}
+
+The gains are economically meaningful but statistically fragile. Table~\ref{tab:sharpe} reports bootstrap tests of Sharpe ratio differences. V2 improves on V1 by 0.19 with a 95\% confidence interval from $-0.11$ to 0.48 ($p = 0.19$). The step from V2a to V2, which adds time-varying portfolio scaling, is the closest to significance ($p = 0.06$), so the time variation in aggregate exposure, rather than the cross-sectional risk balancing alone, is where the marginal improvement sits. The choice between equal risk per asset class and per instrument makes no difference to the Sharpe ratio. This matches the conclusion of \citet{kim2016} that volatility scaling contributes much of TSMOM's apparent performance, with the qualification that in this sample its contribution cannot be distinguished from noise.
+
+\begin{table}[H]
+\centering
+\caption{Sharpe ratio difference tests. Paired stationary bootstrap of monthly returns (mean block 6 months, 5,000 replications); two-sided $p$-value. Corr.: correlation of the two monthly return series.}
+\label{tab:sharpe}
+\small
+\input{tables/tab05_sharpe_tests}
+\end{table}
+
+Figure~\ref{fig:drawdowns} shows the drawdowns. V2's maximum drawdown of 26.8\% ran from January 2016 to February 2019 and was not recovered until April 2022: trend following can be unrewarding for years at a time. V1's drawdown, from March 2009, was not recovered until September 2022. Calendar-year returns show the familiar pattern of trend following: strong in 2008, 2010 and 2022, weak in 2009, 2016 and 2018.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig02_drawdowns.pdf}
+\caption{Drawdowns of the cumulative excess return, daily.}
+\label{fig:drawdowns}
+\end{figure}
+
+\subsection{Volatility targeting in practice}
+
+V2 targets 10\% ex-ante volatility but realised 11.27\% (Table~\ref{tab:volval}), a bias statistic of 1.13. The forecasting error is not a code error: the ex-ante volatility of every rebalanced portfolio was verified independently. The overshoot comes from volatility jumps that a backward-looking estimator cannot anticipate, concentrated in September and October 2008, October 2014, February 2018 and March 2020. The daily data also contribute in the opposite direction: daily-annualised volatility overstates monthly-horizon equity risk (Table~\ref{tab:data}), which on its own would make the equity sleeve run below its budget. Figure~\ref{fig:vollev} shows twelve-month rolling realised volatility ranging from about 5\% to 17\%. The same overshoot appears in long-only risk parity (bias statistic 1.10), so it is a property of the risk model rather than of the trend signal.
+
+\begin{table}[H]
+\centering
+\caption{Accuracy of the volatility forecast. Ex-ante vol is the mean forecast at rebalance; the bias statistic is the standard deviation of monthly returns divided by the ex-ante monthly volatility. Given the kurtosis of V2's standardised returns, the standard error of its bias statistic is about 0.05. $|z|$: absolute standardised monthly return.}
+\label{tab:volval}
+\tabfit{tables/tab14_vol_validation}
+\end{table}
+
+The price of the target is leverage. V2's gross leverage averages 2.15 times net asset value and exceeds 3 in 12\% of months, peaking at 4.58 in the low-volatility spring of 2013 (Table~\ref{tab:leverage}). For futures this is unremarkable; for an ETF implementation it implies margin financing and short borrowing, whose costs are examined in Section~\ref{sec:costs}. Table~\ref{tab:riskshares} shows how the allocation changes the source of risk. Under V1, equities supply 48.5\% of ex-ante portfolio variance; under V2, each asset class supplies between 20.6\% and 32.6\%, with rates the largest because IEF and TLT usually hold same-sign positions.
+
+\begin{table}[H]
+\centering
+\begin{minipage}[t]{0.48\textwidth}
+\centering
+\caption{Average share of ex-ante portfolio variance by asset class (\%).}
+\label{tab:riskshares}
+\small
+\input{tables/tab15_risk_shares}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\centering
+\caption{Distribution of V2 gross leverage across the 222 monthly rebalances.}
+\label{tab:leverage}
+\small
+\input{tables/tab16_leverage}
+\end{minipage}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig08_vol_leverage.pdf}
+\caption{(a) Twelve-month rolling realised volatility of V2 against the 10\% ex-ante target. (b) V2 gross leverage at each monthly rebalance.}
+\label{fig:vollev}
+\end{figure}
+
+\subsection{Is it trend, static exposure, or the futures factor?}
+
+Table~\ref{tab:spanning} reports spanning regressions. Regressed on SPY, V2 has a slightly negative beta ($-0.10$) and an annualised alpha of 6.21\% ($t = 2.25$). This alpha $t$-statistic exceeds the $t$-statistic of V2's raw mean because the negative equity beta is credited for SPY's strong return; it should not be read as significant stand-alone alpha. Against long-only risk parity, the more demanding benchmark, the alpha falls to 4.78\% ($t = 1.76$). V2's correlation with LO-RP is only 0.09, so the trend signal is not a disguised static risk-parity position, but the comparison is noisy and the Sharpe difference between them is insignificant (Table~\ref{tab:sharpe}).
+
+\begin{table}[H]
+\centering
+\caption{Spanning regressions of monthly excess returns, $y_t = \alpha + \beta' f_t + e_t$. Alpha annualised; Newey-West $t$-statistics. Benchmark regressions use 222 months; the AQR regressions use the 218 months to May 2026 for which the AQR factor is available, aligned by calendar month. Correlations of V2's asset-class sleeves with the corresponding AQR asset-class factors: rates 0.83, currencies 0.69, commodities 0.65, equities 0.63.}
+\label{tab:spanning}
+\small
+\input{tables/tab06_spanning}
+\end{table}
+
+The AQR factor provides external validation. V2 has a beta of 0.66 on the AQR TSMOM factor, an $R^2$ of 0.60 (a correlation of 0.77) and an insignificant alpha of 1.37\% a year. Each asset-class sleeve is also positively correlated with the corresponding AQR sleeve. A ten-ETF portfolio therefore reproduces most of the variation of a 58-instrument futures strategy: the implementation captures the same economic phenomenon, and any shortfall in its returns reflects narrower breadth rather than a different strategy.
+
+\subsection{Crisis performance}
+
+Crisis windows are defined by a rule rather than chosen by eye: every peak-to-trough decline of more than 15\% in SPY's total-return index, measured from its running maximum within the sample. The rule yields six windows (Table~\ref{tab:crisis}). The 2010 decline of 15.7\% is not a separate window because SPY had not yet regained its 2008 peak; it falls within the recovery leg of the 2008 episode.
+
+\begin{table}[H]
+\centering
+\caption{Crisis windows: every SPY total-return drawdown deeper than 15\% from its running high, April 2008 to September 2026. SPY drawdown defines the window; the remaining columns are cumulative excess returns over T-bills from the day after the peak to the trough (\%). Lower rows: mean monthly or quarterly excess return (\%) in SPY's worst decile of months and quarters.}
+\label{tab:crisis}
+\small
+\input{tables/tab07_crisis}
+\end{table}
+
+V2 was positive in the three largest drawdowns, gaining 9.2\% from May 2008 to March 2009 (SPY $-51.8\%$), 12.6\% in the February to March 2020 crash (SPY $-33.8\%$) and 30.6\% over the 2022 inflation shock (SPY $-25.3\%$). It lost in the three shorter, sharper episodes of 2011, late 2018 and early 2025, when twelve-month signals were still positioned for the preceding rally. Figure~\ref{fig:crisis} shows the daily paths. In SPY's worst decile of months, V2 averaged $+1.8\%$ against $-8.1\%$ for SPY; long-only risk parity averaged $-2.6\%$.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig03_crisis_zooms.pdf}
+\caption{Cumulative excess return from the SPY peak to the trough in the three largest drawdowns.}
+\label{fig:crisis}
+\end{figure}
+
+The 2020 result is instructive because it contradicts a common expectation, which was also my prior: that trend followers lose in fast crashes because their twelve-month signals are still long equities. An attribution of V2's return from 20 February to 23 March 2020 shows why it did not. The equity sleeve was mixed (long SPY, short EEM, with EFA switching from long to short at the end of February) and lost only 1.2\% in total, while the rest of the book was already positioned defensively: long Treasuries ($+6.6\%$), short the commodity basket ($+4.5\%$ from commodities) and long the dollar against the Australian dollar ($+2.5\%$ from currencies). Equal risk per asset class limited the damage from the one sleeve that was wrong. The same episode exposes the weakness of static risk parity: on 18 March 2020 equities, Treasuries, gold and commodities fell together in the scramble for cash, and LO-RP lost 6.8\% in a day.
+
+Trend following tends to give back part of its crisis gains in the subsequent recovery, when its short equity positions are slow to reverse. V2 lost 5.7\% over the 2020 recovery leg (March to August 2020) and 8.7\% between the October 2022 trough and SPY's new high in December 2023.
+
+Figure~\ref{fig:smile} plots quarterly V2 returns against quarterly SPY returns, the ``smile'' that \citet{fung2001} associate with trend followers, whose payoff resembles a long straddle. The fitted quadratic coefficient is positive (0.67) but not significant ($t = 1.20$, 74 quarters), so the convexity is visible but statistically weak in this sample.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/fig07_smile.pdf}
+\caption{Quarterly V2 excess returns against quarterly SPY excess returns (74 quarters) with the fitted quadratic $r_q = a + b\,\mathrm{SPY}_q + c\,\mathrm{SPY}_q^2$; Newey-West $t$-statistic.}
+\label{fig:smile}
+\end{figure}
+
+\subsection{The regime overlay}
+\label{sec:regime_results}
+
+Table~\ref{tab:regime} evaluates the overlay. The primary version (V3, from the trend-payoff model R1) lowers the Sharpe ratio from 0.45 to 0.39 ($p = 0.32$). Regressed on V2, it has a beta of 1.12 and a negative, insignificant alpha: the overlay mainly raises average exposure (its mean multiplier is 1.19) without improving its timing. The SPY-based model R2 lowers the Sharpe ratio to 0.32. The model trained only on main-sample data does slightly better than the primary but still falls short of V2 (0.43, $p = 0.64$).
+
+\begin{table}[H]
+\centering
+\caption{Regime-conditioned exposure. $\Delta$SR and $p$: Sharpe difference from V2 and bootstrap $p$-value. $\alpha$ on V2: annualised alpha (\%) from regressing the overlay on V2, Newey-West $t$. $^\dagger$Lookahead illustrations use a single full-sample fit and therefore future data; they are not results.}
+\label{tab:regime}
+\small
+\tabfit{tables/tab08_regime}
+\end{table}
+
+Two diagnostics explain the failure. First, the states are not what the labels suggest. In every non-degenerate refit (defined below), the higher-mean ``trending'' state of the trend payoff is also its lower-variance state: the model separates calm periods with a positive payoff from volatile periods with a slightly negative one, so R1 behaves largely as a volatility filter on the trend payoff. Second, the label does not forecast returns. Table~\ref{tab:regime_pred} regresses V2's next-month return on the probability: for the primary model the slope is negative ($t = -0.74$), and in months the model calls ``trending'' V2's Sharpe ratio is 0.33, against 0.80 in the others. For the main-sample model the slope is zero. Under the SPY model, V2 earns the same Sharpe ratio (0.45) in turbulent and calm months, so in this sample there is no evidence that trend returns are concentrated in high-volatility equity regimes. Figure~\ref{fig:regimes} shows the probabilities over time.
+
+\begin{table}[H]
+\centering
+\caption{Does the regime probability forecast trend returns? V2's return in month $t+1$ regressed on the target-state probability $p_t$ (slope in \% per month per unit of probability; Newey-West $t$), and V2's annualised Sharpe ratio in months with $p_t$ above and below 0.5. $^\dagger$Uses future data.}
+\label{tab:regime_pred}
+\small
+\input{tables/tab09_regime_predictive}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/fig04_regimes.pdf}
+\caption{Walk-forward filtered regime probabilities, each set at a month-end and held over the following month. (a) R1, with the holding months of the 25 degenerate fits shaded. (b) R2. (c) Realised volatility of the weekly trend payoff.}
+\label{fig:regimes}
+\end{figure}
+
+\textbf{Degenerate fits.} In 25 of the first 27 monthly refits of the primary model (March 2008 to June 2010), the maximum-likelihood estimate devotes one state to a handful of isolated extreme weeks: that state has a mean payoff of about $-0.27$ per week, against a full-sample weekly standard deviation of 0.07, and a probability of persisting of zero. This is a known weakness of maximum likelihood for mixtures of normal distributions, whose likelihood rewards fitting individual extreme observations \citep{kiefer1978,hamilton1991}. It arose here because the burn-in period contained a few extreme weeks (2 March 2007, 21 March 2003 and 19 May 2006, each a loss of between 0.25 and 0.33), the first of them when the payoff averaged only two instruments and the others when it averaged six. With the outlier absorbed, the remaining state was labelled ``trending'' with probability close to one, so V3 held 1.5 times V2's exposure through the 2008 to 2010 crisis. After June 2010 the longer history dominates and no further degenerate fits occur; the SPY model and the main-sample model have none at all.
+
+The pre-registered primary result is reported unchanged. To show that the conclusion does not depend on these fits, a diagnostic variant, defined after the problem was found and labelled as such, flags a refit as degenerate when either state's probability of persisting is below 0.5 (an expected duration under two weeks) and sets the multiplier to one at flagged refits. Its Sharpe ratio is 0.42 ($p = 0.62$ against V2), and its predictive slope is still negative. Excluding the degenerate fits narrows the gap to V2 but does not reverse it, because the clean fits do not forecast trend returns either.
+
+\textbf{The cost of lookahead.} The same overlay computed from full-sample smoothed probabilities would have reported a Sharpe ratio of 0.57, a gain of 0.12 over V2, a maximum drawdown of 18.7\% instead of 26.8\%, and a positive predictive slope. Using full-sample parameters with filtered probabilities produces no such gain (0.43). Almost all of the spurious improvement therefore comes from smoothing, which conditions each week's state on future observations, rather than from estimating the parameters on the full sample. An overlay that looks valuable in-sample and worthless out-of-sample is the typical signature of this error, and the gap of 0.18 between the smoothed and walk-forward versions measures how large it can be.
+
+\section{Robustness and Validation}
+\label{sec:robust}
+
+\subsection{Signal horizon}
+
+Figure~\ref{fig:horizons} reports V2 at each lookback. The ordering matches the literature: the one-month signal loses money (Sharpe $-0.20$) with a turnover of 28.9 times a year, and performance improves with the horizon to 0.45 at twelve months. The blend of all four horizons earns 0.43. The 95\% confidence intervals overlap heavily, so the evidence ranks the horizons only loosely; the twelve-month primary was fixed in advance and was not selected for being the best.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/fig06_horizons.pdf}
+\caption{V2 Sharpe ratio by signal, net of costs, with 95\% intervals from Lo (2002) standard errors. The intervals are not independent: all variants share the same instruments and sample.}
+\label{fig:horizons}
+\end{figure}
+
+\subsection{Robustness grid}
+
+Table~\ref{tab:robust} varies one element of V2 at a time. Every variant is reported; none was selected. A one-day execution lag leaves the Sharpe ratio unchanged (0.45), so the results do not depend on trading at the signal close. Equal risk per instrument is also identical (0.45). Capping gross leverage at 2 times reduces the Sharpe ratio to 0.41 and volatility to 9.4\%. A faster volatility estimator (centre of mass 20 days) lowers the Sharpe ratio to 0.40 ($p = 0.08$) and widens rather than narrows the volatility overshoot (bias statistic 1.19), so the overshoot reported above is not a matter of a slow estimator. A continuous signal, $\mathrm{clip}(t_{i,t}/2, -1, 1)$ where $t_{i,t}$ is the $t$-statistic of the mean daily excess return over the past twelve months (a risk-adjusted trend measure in the spirit of \citealt{baltas2013}), has the highest point estimate in the grid (0.57), but the difference from V2 is insignificant ($p = 0.22$). This variant was specified during the robustness analysis rather than in the original configuration, before its result was computed, and it was not adopted.
+
+\begin{table}[H]
+\centering
+\caption{Robustness grid: V2 with one element changed. $\Delta$SR and $p$: Sharpe difference from V2 and bootstrap $p$-value. Corr.: correlation with V2. Vol and MDD in \%. Vol bias: bias statistic of the variant's own ex-ante volatility forecast. All net of 10 bps.}
+\label{tab:robust}
+\small
+\input{tables/tab10_robustness}
+\end{table}
+
+Leaving out one asset class at a time shows where the returns come from. Removing equities lowers the Sharpe ratio most (to 0.29, $p = 0.09$), followed by commodities (0.34). Removing currencies raises it to 0.50, consistent with the limited breadth and weak trends of the currency sleeve, although the difference is again insignificant. No single asset class drives the result, but equity and commodity trends contributed most.
+
+\subsection{Subperiods}
+
+Table~\ref{tab:halves} splits the sample into two halves of 111 months. V2's Sharpe ratio is 0.38 in the first half and 0.52 in the second, positive in both and well within one standard error (0.33) of each other. The regime overlays are unstable across halves: V3 is weaker than V2 in the first half, when the degenerate fits occurred, and slightly stronger in the second, while the SPY-regime overlay reverses that pattern. SPY's Sharpe ratio exceeds V2's in both halves.
+
+\begin{table}[H]
+\centering
+\caption{Subperiod halves of 111 months each. Annualised mean excess return (\%) and Sharpe ratio with Lo (2002) standard error.}
+\label{tab:halves}
+\small
+\input{tables/tab11_subperiods}
+\end{table}
+
+\subsection{Costs, borrowing and financing}
+\label{sec:costs}
+
+Table~\ref{tab:costs} and Figure~\ref{fig:costs} show the effect of trading costs. V2 trades 9.8 times its net asset value a year, so each basis point of one-way cost costs about 0.1\% a year. Its Sharpe ratio is 0.54 before costs, 0.45 at the assumed 10 basis points and 0.10 at 50 basis points; its break-even cost is 62 basis points per unit traded, well above the cost of trading these funds. The regime overlay raises turnover to 14.2 and lowers the break-even to 47 basis points. Long-only risk parity, which trades little, overtakes V2 at costs above about 30 basis points.
+
+\begin{table}[H]
+\centering
+\caption{Cost sensitivity. Annual turnover (multiples of NAV), Sharpe ratio at each one-way cost per unit of notional traded, and the linear break-even cost (annual gross mean excess return divided by annual turnover).}
+\label{tab:costs}
+\small
+\input{tables/tab12_costs}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/fig09_costs.pdf}
+\caption{Sharpe ratio against one-way trading cost. The vertical line marks the 10 bps assumption.}
+\label{fig:costs}
+\end{figure}
+
+Financing assumptions matter more than trading costs for an ETF implementation (Table~\ref{tab:fees}). V2 holds short positions averaging 0.98 times net asset value, and a borrow fee of 100 basis points a year lowers its Sharpe ratio from 0.45 to 0.36. A financing spread of 100 basis points over the bill rate on borrowed cash, which averages 0.33 times net asset value, lowers it to 0.42. With both at 100 basis points the Sharpe ratio is 0.33. Long-only risk parity is unaffected by borrow fees but, being leveraged long, more exposed to the financing spread.
+
+\begin{table}[H]
+\centering
+\caption{Sharpe ratio with a borrow fee on short notional and a financing spread over the T-bill rate on borrowed cash (long notional in excess of NAV), both accrued daily on an actual/360 basis; net of 10 bps trading costs.}
+\label{tab:fees}
+\small
+\input{tables/tab13_fees}
+\end{table}
+
+\subsection{Multiple testing}
+
+Twenty-five distinct TSMOM configurations were examined in this study: V1 at four horizons, V2a, four versions of the regime overlay and the sixteen rows of the robustness grid (the lookahead illustrations are excluded). The cross-sectional standard deviation of their Sharpe ratios is 0.17. Against this background, the probability that V2's true Sharpe ratio exceeds zero, adjusted for non-normality but not for selection, is 0.975. The deflated Sharpe ratio, which asks instead whether V2 beats the best Sharpe ratio expected from $N$ independent trials with no true skill, is 0.68 for $N = 25$ (Table~\ref{tab:dsr}). Because the configurations are highly correlated, the effective number of independent trials is well below 25; but even with $N = 2$ the deflated Sharpe ratio is 0.94, below the conventional 0.95 threshold. The primary result is therefore suggestive rather than statistically established, a conclusion consistent with the cautions of \citet{harvey2016} on backtested performance.
+
+\begin{table}[H]
+\centering
+\caption{Deflated Sharpe ratio of V2 \citep{bailey2014}. SR$_0$ is the expected maximum annual Sharpe ratio of $N$ independent zero-skill trials, given the observed cross-trial dispersion (0.17); DSR is the probability that V2's true Sharpe ratio exceeds SR$_0$, adjusted for the skewness and kurtosis of its monthly returns.}
+\label{tab:dsr}
+\small
+\input{tables/tab17_dsr}
+\end{table}
+
+\section{Limitations}
+\label{sec:limitations}
+
+\textbf{ETFs are not futures.} The strategy is a long-short, leveraged portfolio of fully funded ETFs. A futures implementation would hold margin rather than full notional, finance leverage implicitly at close to the bill rate and short without a borrow fee. Here, V2's average gross leverage of 2.15 and short exposure of about one times net asset value would require a margin account, a borrow facility and financing above the bill rate. The fee sensitivities (Table~\ref{tab:fees}) show these costs can remove a quarter of the Sharpe ratio. Margin calls, recall risk on short positions and regulatory leverage limits on retail accounts are not modelled.
+
+\textbf{Breadth.} Ten instruments, with an effective number of independent bets well below ten, are far fewer than the 58 in MOP or the hundreds traded by large managed-futures funds. Equities and Treasuries are each close to a single bet, and the three currency funds are correlated (Table~\ref{tab:corr}). Low breadth makes returns more concentrated and the statistics noisier; the shortfall against the AQR factor's Sharpe ratio is at least partly a breadth effect.
+
+\textbf{One sample, one bond cycle.} The 18.5-year sample contains one long decline in interest rates followed by one sharp rise. Long Treasury positions contributed in the first part and short positions in 2022, and both helped. A sample with a different rate path could produce materially different results. More generally, 222 months give a Sharpe ratio standard error of about 0.23, so even a true Sharpe ratio of 0.5 would be hard to distinguish from zero; none of the comparisons between variants is significant, and the deflated Sharpe ratio is below the conventional threshold.
+
+\textbf{Commodity fund mechanics.} The project specification noted that commodity ETFs carry roll-yield and contango effects that are not modelled. More precisely, DBC holds futures, so roll yield and contango are already in its returns, exactly as for a futures position, and because it holds bill collateral, subtracting the bill rate turns its total return into a close analogue of a futures excess return. The real differences are that DBC rolls according to an ``optimum yield'' rule rather than front-month rolling, and charges about 0.85\% a year. GLD holds physical gold, so it has no roll but carries storage cost through its expense ratio. Fund expenses are inside the returns of all ten ETFs, which is appropriate for an investable strategy but makes the comparison with futures slightly unfavourable.
+
+\textbf{Costs and execution.} Costs are a flat 10 basis points per unit traded with no market impact, no dependence on volatility and no intraday execution. Trades are assumed to execute at the signal close. A one-day lag changes little, but trading at the close is itself an idealisation. At the scale of a personal account these assumptions are conservative for the equity and Treasury funds and less so for the smaller currency funds, whose trading volume is modest. No capacity analysis is attempted.
+
+\textbf{Volatility forecast.} Realised volatility exceeded the target by 13\%, and the overshoot is concentrated in volatility jumps. A portfolio sized to a risk limit would have breached it in the episodes that matter most. The risk model uses a 60-day exponentially weighted volatility and a trailing one-year correlation matrix; it cannot anticipate jumps or a sudden change in correlations such as March 2020, when bonds and equities fell together.
+
+\textbf{Regime model.} The Markov-switching model has limited power with weekly data over about 20 years, its states separate mainly on variance rather than mean, and its maximum-likelihood estimates were degenerate in 25 early refits. Burn-in composition also changes: the trend payoff averages over two to ten instruments before April 2008, so its scale is not constant. Alternative specifications (fat-tailed errors, a minimum regime duration, normalising the payoff by the number of instruments, more states) were not explored, because choosing among them after seeing results would be a specification search. The negative result applies to this specification and should not be read as evidence against regime conditioning in general.
+
+\textbf{Multiple testing and researcher choices.} The design was fixed in advance, and every configuration examined is reported. Some choices, nonetheless, were made with knowledge of the literature's results on longer samples, such as the twelve-month horizon and the 60-day volatility estimator, and two elements were added after results were seen: the degenerate-fit diagnostic and the continuous-signal specification. Both are identified in the text, neither changes a primary result, and the deflated Sharpe ratio accounts for the full set of configurations.
+
+\textbf{Data.} Prices are from a free source (Yahoo Finance). The total-return series was verified against distributions and every large move was checked, but the data are not from an institutional vendor. The universe was chosen in 2026 from funds that exist today. All ten were among the largest and most liquid in their categories throughout the sample, so survivorship bias is limited, but it is not zero: a fund that might have been chosen in 2008 and later closed would not be in the universe.
+
+\section{Conclusion}
+
+A time-series momentum strategy built from ten liquid ETFs earned a positive return over 2008 to 2026, and volatility targeting was the layer that made it useful: it raised the Sharpe ratio from 0.26 to 0.45, turned negative skewness positive and balanced risk across asset classes. The volatility-targeted strategy delivered the property that justifies trend following in a portfolio, gaining in each of the three largest equity drawdowns of the sample, and it tracks the AQR futures factor closely enough to confirm that the ETF implementation captures the same phenomenon. The improvement from volatility targeting is, however, not statistically significant, and after accounting for the configurations examined, neither is the strategy's Sharpe ratio.
+
+The regime overlay did not help. Its walk-forward versions lowered the Sharpe ratio, its ``trending'' state was mainly a low-volatility state with no forecasting power, and its early estimates were degenerate. The same overlay with smoothed probabilities would have appeared to add 0.12 to the Sharpe ratio, which illustrates how much of the apparent value of regime models in finance can be an artefact of using future information.
+
+The honest summary is that the evidence supports trend following as a crisis diversifier with modest and statistically fragile stand-alone returns over this period. Natural extensions are a broader futures universe to raise breadth, a comparison of volatility estimators that react to jumps, and regime models with fat-tailed errors evaluated on a longer history.
+
+\begin{thebibliography}{99}
+\setlength{\itemsep}{2pt}
+\small
+
+\bibitem[Ang and Bekaert(2002)]{ang2002}
+Ang, A. and Bekaert, G. (2002). International asset allocation with regime shifts. \textit{Review of Financial Studies}, 15(4), 1137--1187.
+
+\bibitem[Bailey and L\'opez de Prado(2014)]{bailey2014}
+Bailey, D.\,H. and L\'opez de Prado, M. (2014). The deflated Sharpe ratio: Correcting for selection bias, backtest overfitting and non-normality. \textit{Journal of Portfolio Management}, 40(5), 94--107.
+
+\bibitem[Baltas and Kosowski(2013)]{baltas2013}
+Baltas, N. and Kosowski, R. (2013). Momentum strategies in futures markets and trend-following funds. Working paper, Imperial College Business School.
+
+\bibitem[Daniel and Moskowitz(2016)]{daniel2016}
+Daniel, K. and Moskowitz, T.\,J. (2016). Momentum crashes. \textit{Journal of Financial Economics}, 122(2), 221--247.
+
+\bibitem[Fung and Hsieh(2001)]{fung2001}
+Fung, W. and Hsieh, D.\,A. (2001). The risk in hedge fund strategies: Theory and evidence from trend followers. \textit{Review of Financial Studies}, 14(2), 313--341.
+
+\bibitem[Hamilton(1989)]{hamilton1989}
+Hamilton, J.\,D. (1989). A new approach to the economic analysis of nonstationary time series and the business cycle. \textit{Econometrica}, 57(2), 357--384.
+
+\bibitem[Hamilton(1991)]{hamilton1991}
+Hamilton, J.\,D. (1991). A quasi-Bayesian approach to estimating parameters for mixtures of normal distributions. \textit{Journal of Business and Economic Statistics}, 9(1), 27--39.
+
+\bibitem[Harvey et~al.(2016)]{harvey2016}
+Harvey, C.\,R., Liu, Y. and Zhu, H. (2016). \ldots\ and the cross-section of expected returns. \textit{Review of Financial Studies}, 29(1), 5--68.
+
+\bibitem[Harvey et~al.(2018)]{harvey2018}
+Harvey, C.\,R., Hoyle, E., Korgaonkar, R., Rattray, S., Sargaison, M. and Van Hemert, O. (2018). The impact of volatility targeting. \textit{Journal of Portfolio Management}, 45(1), 14--33.
+
+\bibitem[Huang et~al.(2020)]{huang2020}
+Huang, D., Li, J., Wang, L. and Zhou, G. (2020). Time series momentum: Is it there? \textit{Journal of Financial Economics}, 135(3), 774--794.
+
+\bibitem[Hurst et~al.(2017)]{hurst2017}
+Hurst, B., Ooi, Y.\,H. and Pedersen, L.\,H. (2017). A century of evidence on trend-following investing. \textit{Journal of Portfolio Management}, 44(1), 15--29.
+
+\bibitem[Kiefer(1978)]{kiefer1978}
+Kiefer, N.\,M. (1978). Discrete parameter variation: Efficient estimation of a switching regression model. \textit{Econometrica}, 46(2), 427--434.
+
+\bibitem[Kim et~al.(2016)]{kim2016}
+Kim, A.\,Y., Tse, Y. and Wald, J.\,K. (2016). Time series momentum and volatility scaling. \textit{Journal of Financial Markets}, 30, 103--124.
+
+\bibitem[Ledoit and Wolf(2008)]{ledoit2008}
+Ledoit, O. and Wolf, M. (2008). Robust performance hypothesis testing with the Sharpe ratio. \textit{Journal of Empirical Finance}, 15(5), 850--859.
+
+\bibitem[Lo(2002)]{lo2002}
+Lo, A.\,W. (2002). The statistics of Sharpe ratios. \textit{Financial Analysts Journal}, 58(4), 36--52.
+
+\bibitem[Moreira and Muir(2017)]{moreira2017}
+Moreira, A. and Muir, T. (2017). Volatility-managed portfolios. \textit{Journal of Finance}, 72(4), 1611--1644.
+
+\bibitem[Moskowitz et~al.(2012)]{moskowitz2012}
+Moskowitz, T.\,J., Ooi, Y.\,H. and Pedersen, L.\,H. (2012). Time series momentum. \textit{Journal of Financial Economics}, 104(2), 228--250.
+
+\bibitem[Newey and West(1994)]{newey1994}
+Newey, W.\,K. and West, K.\,D. (1994). Automatic lag selection in covariance matrix estimation. \textit{Review of Economic Studies}, 61(4), 631--653.
+
+\bibitem[Politis and Romano(1994)]{politis1994}
+Politis, D.\,N. and Romano, J.\,P. (1994). The stationary bootstrap. \textit{Journal of the American Statistical Association}, 89(428), 1303--1313.
+
+\end{thebibliography}
+
+\end{document}
