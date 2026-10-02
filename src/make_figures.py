@@ -340,6 +340,7 @@ def fig_blend(save):
                  fontsize=6.5, color=MUTED, va="bottom")
     axes[1].set_xlim(b.index[0] - pd.Timedelta(days=30), b.index[-1] + pd.Timedelta(days=30))
     fig.tight_layout(h_pad=1.0)
+    fig.savefig(FIG_DIR / "fig10_blend.png", dpi=170, metadata={"Software": None})   # README headline figure
     save(fig, "fig10_blend")
 
 

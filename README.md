@@ -1,18 +1,21 @@
 # Time-Series Momentum with Volatility Targeting and Regime-Conditioned Exposure
 
-Does a multi-asset time-series momentum (TSMOM) strategy, built only from liquid ETFs, earn
-a positive risk-adjusted return over 2008 to 2026? How much of its performance comes from
-the trend signal, from volatility targeting, and from a regime-conditioned exposure overlay?
-And does it deliver "crisis alpha" when equities fall?
+**A ten-ETF trend-following strategy (2008 to 2026) earns a Sharpe ratio of 0.45 after volatility targeting, below
+SPY's 0.72, so its value is as a diversifier: it gained in the three largest equity crashes, and a pre-specified 20%
+allocation beside a 60/40 portfolio cut the maximum drawdown from -32.3% to -25.3% (the Sharpe gain is not significant).**
 
-I implement the strategy of Moskowitz, Ooi and Pedersen (2012) on ten ETFs across equities,
-Treasuries, commodities and currencies, over 222 months (April 2008 to September 2026), and
-decompose it layer by layer. **Every design parameter was committed to version control
-before the first backtest was run**, so the git history documents that nothing was tuned to
-the results.
+- **One-page summary:** [SUMMARY.pdf](SUMMARY.pdf)
+- **Full paper (27 pages):** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf) (LaTeX source: [`paper/main.tex`](paper/main.tex))
 
-**Full paper:** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf)
-(24 pages; LaTeX source in [`paper/main.tex`](paper/main.tex))
+![60/40 against 80% 60/40 + 20% trend: growth and drawdowns](paper/figures/fig10_blend.png)
+
+*60/40 against 80% 60/40 + 20% V2, daily. The blend's drawdowns are shallower in 2008, 2020 and 2022; its
+cumulative return finishes slightly lower because its mean is lower.*
+
+I implement the strategy of Moskowitz, Ooi and Pedersen (2012) on ten ETFs across equities, Treasuries,
+commodities and currencies, over 222 months (April 2008 to September 2026), and decompose it layer by layer.
+**Every design parameter was committed to version control before the first backtest was run**, so the git
+history documents that nothing was tuned to the results.
 
 ---
 
@@ -40,6 +43,11 @@ the results.
   low-volatility state with no forecasting power. Using full-sample smoothed probabilities
   instead would have reported a spurious +0.12 Sharpe gain: a demonstration of how a common
   lookahead error flatters regime models.
+- **As a diversifier (pre-specified, added after the main results).** 80% 60/40 + 20% V2, rebalanced monthly:
+  maximum drawdown -32.3% to -25.3%, smaller loss in all six equity crisis windows (2022: -21.6% to -12.6%),
+  Sharpe 0.74 to 0.86 but not significant (bootstrap p = 0.08), and a lower mean (7.15% to 6.74%). For an
+  equity-only investor (80% SPY + 20% V2): drawdown -51.8% to -42.7%, Sharpe 0.72 to 0.80 (p = 0.04, or 0.08
+  after a Bonferroni adjustment for testing two blends). The 20% weight was fixed in advance, not optimised.
 - **Honest significance.** After deflating for the 25 configurations examined (Bailey and
   López de Prado 2014), V2's Sharpe ratio is not significant at 5% (DSR 0.68). The evidence
   supports trend following as a crisis diversifier, not as a reliably profitable stand-alone
@@ -60,7 +68,7 @@ the results.
 | Engine | Daily self-financing backtest, monthly rebalance, weight drift, 10 bps per unit traded | Captures intra-month drawdowns (March 2020) |
 | Inference | Newey-West t; Lo (2002) Sharpe SEs; paired stationary bootstrap for Sharpe differences; deflated Sharpe ratio | Variants are highly correlated, so naive Sharpe comparisons are invalid |
 
-**Validation.** 39 automated tests, including truncation tests: signals, volatilities,
+**Validation.** 42 automated tests, including truncation tests: signals, volatilities,
 weights, backtest returns and regime probabilities are recomputed after deleting all
 data after a cut-off date (including mid-crash March 2020), and every earlier value must be
 unchanged. The engine is checked against hand-calculated cases, the targeted ex-ante
@@ -81,12 +89,12 @@ pip install -r requirements.txt
 cd src
 python fetch_prices.py && python fetch_rates.py && python fetch_benchmarks.py
 python run_all.py          # every result, table and figure (about 6 minutes)
-cd .. && python -m pytest  # 39 tests
+cd .. && python -m pytest  # 42 tests
 ```
 
 Downloads are kept separate from the pipeline because Yahoo revises adjusted prices over
-time; everything downstream of `data/` is deterministic. Paper: compile `paper/main.tex`
-with pdflatex (standard packages only).
+time; everything downstream of `data/` is deterministic. Paper (`paper/main.tex`) and summary
+(`paper/summary.tex`): compile with pdflatex (standard packages only).
 
 | Stage | Script | What it does |
 |---|---|---|
@@ -97,6 +105,7 @@ with pdflatex (standard packages only).
 | 4 | `portfolio.py`, `run_stage4.py` | Volatility targeting (V2), benchmarks, spanning, AQR validation |
 | 5 | `regime.py`, `run_stage5.py` | Walk-forward Markov-switching overlay (V3), lookahead illustration |
 | 6 | `run_stage6.py` | Crisis windows, smile, costs and financing, robustness grid, deflated Sharpe |
+| 6b | `run_blend.py` | Trend as a diversifier: pre-registered 80/20 blends with 60/40 and SPY |
 | 7 | `make_figures.py`, `make_tables.py` | Every figure and table in the paper, from saved outputs |
 
 ## References
