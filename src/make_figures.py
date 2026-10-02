@@ -299,6 +299,50 @@ def fig_costs(save):
     save(fig, "fig09_costs")
 
 
+def fig_blend(save):
+    """60/40 against 80% 60/40 + 20% V2: growth and drawdowns, daily."""
+    b = out("blend_daily_returns")
+    d = out("stage6_daily_returns")
+    win = out("stage6_crisis_windows")
+    blend_color = "#eda100"   # next unused categorical slot; sub-3:1 contrast, so legend + end labels
+    series = {"60/40": d["60/40"], "60/40+V2": b["60/40+V2"]}
+    style = {"60/40": dict(color=COLOR["60/40"], ls=STYLE["60/40"], lw=1.1, label="60/40"),
+             "60/40+V2": dict(color=blend_color, lw=1.6, label="80% 60/40 + 20% V2")}
+    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 4.6), sharex=True,
+                             gridspec_kw={"height_ratios": [1.4, 1]})
+    for ax in axes:
+        for peak in ("2008-05-19", "2020-02-19", "2022-01-03"):
+            ax.axvspan(pd.Timestamp(peak), pd.Timestamp(win.loc[peak, "trough"]), color=SHADE, lw=0, zorder=0)
+    growth = {k: wealth(v) for k, v in series.items()}
+    for k, w in growth.items():
+        axes[0].plot(w.index, w, zorder=3, **style[k])
+    axes[0].set_yscale("log")
+    axes[0].yaxis.set_major_locator(matplotlib.ticker.FixedLocator([0.75, 1, 1.5, 2, 3, 4]))
+    axes[0].yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
+    axes[0].yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    axes[0].set_ylabel("Growth of 1 (excess of T-bills, log)")
+    axes[0].set_title("(a) Cumulative excess return")
+    axes[0].legend(loc="upper left")
+    short = {"60/40": "60/40", "60/40+V2": "Blend"}
+    for k, w in growth.items():   # end labels, nudged apart (blend ends lower)
+        axes[0].annotate(f"{short[k]} {w.iloc[-1]:.2f}", xy=(1.0, w.iloc[-1]), xycoords=("axes fraction", "data"),
+                         xytext=(4, 5 if k == "60/40" else -5), textcoords="offset points", va="center",
+                         fontsize=7, color=INK2)
+    for k, w in growth.items():
+        dd = (w / w.cummax() - 1) * 100
+        axes[1].plot(dd.index, dd, zorder=3, **style[k])
+        axes[1].annotate(f"{short[k]} {dd.min():.1f}%", xy=(dd.idxmin(), dd.min()), xytext=(8, -1),
+                         textcoords="offset points", fontsize=7, color=INK2, va="center")
+    axes[1].set_ylabel("Drawdown (%)")
+    axes[1].set_title("(b) Drawdown from running peak")
+    axes[1].set_ylim(-38, 2)
+    axes[1].text(pd.Timestamp("2020-02-19"), -37, " shaded: 2008, 2020, 2022 crisis windows",
+                 fontsize=6.5, color=MUTED, va="bottom")
+    axes[1].set_xlim(b.index[0] - pd.Timedelta(days=30), b.index[-1] + pd.Timedelta(days=30))
+    fig.tight_layout(h_pad=1.0)
+    save(fig, "fig10_blend")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--png", type=Path, default=None)
@@ -314,7 +358,7 @@ def main():
         print(f"wrote {name}")
 
     for f in (fig_cumulative, fig_drawdowns, fig_crisis, fig_regimes, fig_predictive,
-              fig_horizons, fig_smile, fig_vol_leverage, fig_costs):
+              fig_horizons, fig_smile, fig_vol_leverage, fig_costs, fig_blend):
         f(save)
 
 
