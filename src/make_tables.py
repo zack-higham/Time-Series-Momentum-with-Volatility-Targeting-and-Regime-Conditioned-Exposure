@@ -297,7 +297,58 @@ def tab_dsr():
     write("tab17_dsr", tabular("lrr", [["Number of trials $N$", "SR$_0$ (annual)", "DSR"]], rows))
 
 
+BLEND_NAME = {"60/40": "60/40", "60/40+V2": "80\\% 60/40 + 20\\% V2", "SPY": "SPY", "SPY+V2": "80\\% SPY + 20\\% V2"}
+
+
+def tab_blend():
+    m = csv("blend_metrics", index_col=0)
+    t = csv("blend_sharpe_tests", index_col=0)
+    to = csv("blend_turnover", index_col=0)
+    rows = []
+    for n in ("60/40", "60/40+V2", "SPY", "SPY+V2"):
+        r = m.loc[n]
+        is_blend = n in t.index
+        rows.append([BLEND_NAME[n], num(r.ann_ret_pct), num(r.ann_vol_pct), num(r.sharpe),
+                     f"({num(r.sharpe_se_lo)})", num(r.max_dd_pct, 1), r.mdd_peak, r.mdd_trough,
+                     r.mdd_recovery, num(r.calmar), num(r.skew_m),
+                     "--" if is_blend else num(r.corr_v2),
+                     num(t.loc[n, "diff"], sign=True) if is_blend else "",
+                     pval(t.loc[n, "p_value"]) if is_blend else "",
+                     num(to.loc[n, "sleeve_turnover_yr"]) if is_blend else ""])
+    write("tab18_blend", tabular(
+        "lrrrrrccccrrrrr",
+        ["& & & & & \\multicolumn{4}{c}{Maximum drawdown} & & & & \\multicolumn{2}{c}{vs benchmark} & \\\\",
+         "\\cmidrule(lr){6-9} \\cmidrule(lr){13-14}",
+         ["", "Mean", "Vol", "Sharpe", "(SE)", "MDD", "Peak", "Trough", "Recovery", "Calmar",
+          "Skew$_m$", "Corr.", "$\\Delta$SR", "$p$", "Turn."]],
+        rows, groups={0: "\\multicolumn{15}{l}{\\textit{Primary: 60/40 investor}} \\\\",
+                      2: "\\multicolumn{15}{l}{\\textit{Secondary: equity-only investor}} \\\\"}))
+
+
+def tab_blend_crisis():
+    c = csv("blend_crisis_windows")
+    rows = [[r.peak, r.trough, num(r["60/40"], 1), num(r["60/40+V2"], 1),
+             num(r["60/40+V2"] - r["60/40"], 1, sign=True), num(r.SPY, 1), num(r["SPY+V2"], 1),
+             num(r["SPY+V2"] - r.SPY, 1, sign=True)] for _, r in c.iterrows()]
+    rows.append("\\midrule")
+    q = csv("blend_worst_decile", index_col=[0, 1])
+    for freq, lab in (("month", "SPY worst-decile months, mean"), ("quarter", "SPY worst-decile quarters, mean")):
+        x = q.loc[freq]
+        n = int(x.n_worst.iloc[0])
+        a, b = x.loc["60/40", "mean_worst_pct"], x.loc["60/40+V2", "mean_worst_pct"]
+        s, sb = x.loc["SPY", "mean_worst_pct"], x.loc["SPY+V2", "mean_worst_pct"]
+        rows.append([f"\\multicolumn{{2}}{{l}}{{{lab} ($n={n}$)}}", num(a, 1), num(b, 1), num(b - a, 1, sign=True),
+                     num(s, 1), num(sb, 1), num(sb - s, 1, sign=True)])
+    write("tab19_blend_crisis", tabular(
+        "llrrrrrr",
+        ["& & \\multicolumn{3}{c}{60/40 investor} & \\multicolumn{3}{c}{Equity-only investor} \\\\",
+         "\\cmidrule(lr){3-5} \\cmidrule(lr){6-8}",
+         ["Peak", "Trough", "60/40", "Blend", "Change", "SPY", "Blend", "Change"]], rows))
+
+
 def main():
+    tab_blend()
+    tab_blend_crisis()
     tab_dsr()
     tab_risk()
     tab_data()
