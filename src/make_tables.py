@@ -297,32 +297,37 @@ def tab_dsr():
     write("tab17_dsr", tabular("lrr", [["Number of trials $N$", "SR$_0$ (annual)", "DSR"]], rows))
 
 
-BLEND_NAME = {"60/40": "60/40", "60/40+V2": "80\\% 60/40 + 20\\% V2", "SPY": "SPY", "SPY+V2": "80\\% SPY + 20\\% V2"}
+BLEND_NAME = {"60/40": "60/40", "60/40+V2": "80/20 blend", "SPY": "SPY", "SPY+V2": "80/20 blend"}
 
 
 def tab_blend():
     m = csv("blend_metrics", index_col=0)
     t = csv("blend_sharpe_tests", index_col=0)
     to = csv("blend_turnover", index_col=0)
+    order = ["60/40", "60/40+V2", "SPY", "SPY+V2"]
+    # every maximum drawdown spans the same 2008-09 episode: state it once
+    assert m.loc[order, "mdd_peak"].nunique() == 1 and m.loc[order, "mdd_trough"].nunique() == 1
     rows = []
-    for n in ("60/40", "60/40+V2", "SPY", "SPY+V2"):
+    for n in order:
         r = m.loc[n]
         is_blend = n in t.index
         rows.append([BLEND_NAME[n], num(r.ann_ret_pct), num(r.ann_vol_pct), num(r.sharpe),
-                     f"({num(r.sharpe_se_lo)})", num(r.max_dd_pct, 1), r.mdd_peak, r.mdd_trough,
-                     r.mdd_recovery, num(r.calmar), num(r.skew_m),
-                     "--" if is_blend else num(r.corr_v2),
+                     f"({num(r.sharpe_se_lo)})", num(r.max_dd_pct, 1), r.mdd_recovery, num(r.calmar),
+                     num(r.skew_m), "--" if is_blend else num(r.corr_v2),
                      num(t.loc[n, "diff"], sign=True) if is_blend else "",
                      pval(t.loc[n, "p_value"]) if is_blend else "",
                      num(to.loc[n, "sleeve_turnover_yr"]) if is_blend else ""])
+    rows.append("\\midrule")
+    rows.append(f"\\multicolumn{{13}}{{l}}{{All four maximum drawdowns: peak {m.loc[order[0], 'mdd_peak']}, "
+                f"trough {m.loc[order[0], 'mdd_trough']}.}} \\\\")
     write("tab18_blend", tabular(
-        "lrrrrrccccrrrrr",
-        ["& & & & & \\multicolumn{4}{c}{Maximum drawdown} & & & & \\multicolumn{2}{c}{vs benchmark} & \\\\",
-         "\\cmidrule(lr){6-9} \\cmidrule(lr){13-14}",
-         ["", "Mean", "Vol", "Sharpe", "(SE)", "MDD", "Peak", "Trough", "Recovery", "Calmar",
+        "lrrrrrcrrrrrr",
+        ["& & & & & \\multicolumn{2}{c}{Max.\\ drawdown} & & & & \\multicolumn{2}{c}{vs benchmark} & \\\\",
+         "\\cmidrule(lr){6-7} \\cmidrule(lr){11-12}",
+         ["", "Mean", "Vol", "Sharpe", "(SE)", "MDD", "Recovery", "Calmar",
           "Skew$_m$", "Corr.", "$\\Delta$SR", "$p$", "Turn."]],
-        rows, groups={0: "\\multicolumn{15}{l}{\\textit{Primary: 60/40 investor}} \\\\",
-                      2: "\\multicolumn{15}{l}{\\textit{Secondary: equity-only investor}} \\\\"}))
+        rows, groups={0: "\\multicolumn{13}{l}{\\textit{Primary: 60/40 investor}} \\\\",
+                      2: "\\multicolumn{13}{l}{\\textit{Secondary: equity-only investor}} \\\\"}))
 
 
 def tab_blend_crisis():
