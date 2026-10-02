@@ -120,6 +120,43 @@ BOOTSTRAP_MEAN_BLOCK_MONTHS = 6   # stationary bootstrap (Politis and Romano 199
 BOOTSTRAP_SEED = 2026
 
 
+# --- Portfolio application: trend as a diversifier (added 2026-10-02) ---------
+# Added after every result above had been seen, and fixed here before any
+# blend number was computed. It does not change the trend strategy: V2 is used
+# exactly as reported, so it is not a further trend configuration and does not
+# enter the deflated Sharpe ratio's trial count.
+#
+# Primary blend: 80% in the 60/40 benchmark + 20% in V2. Secondary: 80% SPY +
+# 20% V2. Justification: 10% to 20% is a common allocation range for managed
+# futures in diversified portfolios, and 20% is the round number at the top of
+# that range. It was not chosen by comparing alternatives, and no other weight
+# is computed.
+#
+# Construction (daily, matching the engine): sleeves are rebalanced to the
+# fixed weights at the close of each month's last trading day (the engine's
+# rebalance dates) and drift with their returns within the month,
+#     R_blend,d = a_{d-1} R_bench,d + (1 - a_{d-1}) R_V2,d,
+#     a_d = a_{d-1} (1 + rf_d + R_bench,d) / (1 + rf_d + R_blend,d).
+# Monthly excess returns compound the daily ones exactly as for every other
+# series (backtest.monthly_excess), over the same 222 months. V2 is net of its
+# 10 bps costs; the 60/40 and SPY benchmarks are gross, as in the rest of the
+# paper. Rebalancing turnover is reported as the NAV moved between sleeves per
+# year, and as an upper bound on instrument notional traded (sleeve trade x
+# that sleeve's gross leverage); no cost is deducted from the blend.
+# Drawdowns are measured on the daily series, like every other drawdown.
+# Inference: Sharpe difference of each blend against its own benchmark with the
+# paired stationary bootstrap above (same block length, reps and seed).
+#
+# Interpretation rule: the headline is the effect on maximum drawdown and on
+# losses in the six rule-based crisis windows, the purpose of a diversifier.
+# The Sharpe change is reported with its bootstrap p-value; if p > 0.05 it is
+# described as not significant, and the blend is not described as "improving
+# the portfolio" unless the evidence supports it.
+BLEND_WEIGHT_TREND = 0.20
+BLENDS = {"60/40+V2": "60/40", "SPY+V2": "SPY"}   # blend -> its benchmark
+BLEND_TREND_SERIES = "V2"
+
+
 def newey_west_lags(n_obs: int) -> int:
     """Newey-West (1994) automatic lag rule, floor(4 * (T/100)^(2/9))."""
     return int(4 * (n_obs / 100) ** (2 / 9))
