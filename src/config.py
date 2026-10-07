@@ -201,6 +201,36 @@ BLEND_TREND_SERIES = "V2"
 # the lookahead illustrations, and is not counted.
 NORM_OVERLAY_FIRST_LIVE = "2008-03-31"
 
+# --- Daily versus monthly volatility of equities (added 2026-10-07) -----------
+# Added after the results, and fixed here before computing. Table 1 states that
+# daily-annualised volatility exceeds monthly volatility, markedly for equities,
+# because daily equity returns were negatively autocorrelated in 2008 to 2009.
+# That is stated, not shown. Check, for SPY, EFA and EEM:
+#     VR = Var(monthly excess return) / (21 x Var(daily excess return)),
+# with exactly Table 1's definitions (check_data.summarise_main_sample: daily
+# total return minus the daily bill return; monthly compounded total return
+# minus the compounded bill return), over three windows: the full main sample
+# (2008-04 to 2026-09), 2008-04 to 2009-12, and 2010-01 to 2026-09.
+# VR < 1 means monthly risk is below what daily volatility implies (negative
+# autocorrelation of daily returns within the month); VR = 1 under independence.
+#
+# Interpretation rule. The claim is supported if, for each of the three funds,
+# (i) the full-sample VR is below 1, (ii) the 2008-09 VR is below the
+# full-sample VR, and (iii) the 2010-26 VR is at least 0.85 ("close to 1": the
+# sampling standard error of a variance ratio over ~200 months is about
+# sqrt(2/200) = 0.10, so 0.85 is 1.5 standard errors). Partially supported if
+# (i) and (ii) hold but (iii) fails for some fund; then the caption is reworded
+# to say the gap is not confined to 2008-09. Not supported otherwise; then the
+# caption sentence is corrected. The 2008-09 window has only 21 monthly
+# observations, so its VR is imprecise; this is stated with the result.
+# Reported as a footnote in Section 2, generated from the saved output (adding
+# a table would renumber every later table).
+VR_FUNDS = ("SPY", "EFA", "EEM")
+VR_WINDOWS = {"Full sample": ("2008-04", "2026-09"),
+              "2008-04 to 2009-12": ("2008-04", "2009-12"),
+              "2010-01 to 2026-09": ("2010-01", "2026-09")}
+VR_CLOSE_TO_ONE = 0.85
+
 def newey_west_lags(n_obs: int) -> int:
     """Newey-West (1994) automatic lag rule, floor(4 * (T/100)^(2/9))."""
     return int(4 * (n_obs / 100) ** (2 / 9))
