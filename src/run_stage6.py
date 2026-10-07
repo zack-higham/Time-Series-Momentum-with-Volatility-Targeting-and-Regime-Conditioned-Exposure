@@ -356,6 +356,7 @@ def main():
     save_output(pd.DataFrame([dsr]), "stage6_deflated_sharpe")
     save_output(eff.set_index("n_trials"), "stage6_dsr_sensitivity")
     save_output(pd.Series(tr.columns, name="trial"), "stage6_trials")
+    save_output(pd.Series(srs, index=tr.columns, name="sr_monthly"), "stage6_trial_sharpes")
 
 
 if __name__ == "__main__":

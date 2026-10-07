@@ -18,6 +18,7 @@ NAME = {"V1": "V1 raw TSMOM", "V2a": "V2a inverse-vol", "V2": "V2 vol-targeted",
         "V3": "V3 regime (R1)", "V3_R2": "V3-R2 regime (SPY)", "V3_main": "V3 main-sample HMM",
         "V3_nodegen": "V3 excl.\\ degenerate fits", "V3_LA_smoothed": "Smoothed probabilities$^\\dagger$",
         "V3_LA_fullparams": "Full-sample parameters$^\\dagger$",
+        "V3_norm": "V3 normalised (walk-forward)",
         "LO_RP": "Long-only risk parity", "SPY": "SPY", "60/40": "60/40", "V2_inst": "V2 per-instrument"}
 
 
@@ -181,24 +182,39 @@ def tab_regime():
     p = csv("stage5_performance", index_col=0)
     sd = csv("stage5_sharpe_tests", index_col=0)
     sp = csv("stage5_spanning", index_col=0)
+    # Exposure-normalised overlay and constant-leverage diagnostic (pre-registered 2026-10-07)
+    p = pd.concat([p, csv("overlay_norm_performance", index_col=0).loc[["V3_norm", "V2_x_const"]]])
+    nsd = csv("overlay_norm_sharpe_tests", index_col=[0, 1])
+    sd = pd.concat([sd, nsd.xs("V2", level="b").loc[["V3_norm"]]])
+    sp = pd.concat([sp, csv("overlay_norm_spanning", index_col=0).loc[["V3_norm"]]])
+    c = csv("overlay_norm_multipliers", index_col=0)["m_v3"].mean()   # V3's mean multiplier
+    NAME["V2_x_const"] = f"V2 $\\times$ {c:.2f}$^\\ddagger$"
     rows = []
-    for n in ["V2", "V3", "V3_R2", "V3_main", "V3_nodegen", "V3_LA_smoothed", "V3_LA_fullparams"]:
+    order = ["V2", "V3", "V3_R2", "V3_main", "V3_nodegen", "V3_norm", "V2_x_const",
+             "V3_LA_smoothed", "V3_LA_fullparams"]
+    for n in order:
         r = p.loc[n]
         d = sd.loc[n] if n in sd.index else None
         a = sp.loc[n] if n in sp.index else None
+        # V2 x constant has V2's Sharpe ratio by construction (up to intra-month drift),
+        # so its difference is shown as zero and no test is reported.
+        dsr_cell = "0.00" if n == "V2_x_const" else num(d["diff"], sign=True) if d is not None else "--"
         rows.append([NAME[n], num(r.ann_ret_pct), num(r.ann_vol_pct), num(r.sharpe), num(r.max_dd_pct, 1),
-                     num(r.mean_gross_lev),
-                     num(d["diff"], sign=True) if d is not None else "--",
+                     num(r.mean_gross_lev), dsr_cell,
                      pval(d.p_value) if d is not None else "--",
                      num(a.alpha_ann_pct) if a is not None else "--",
                      num(a.alpha_t) if a is not None else "--"])
     write("tab08_regime", tabular(
         "lrrrrrrrrr",
         [["", "Mean", "Vol", "Sharpe", "MDD", "Lev.", "$\\Delta$SR", "$p$", "$\\alpha$ on V2", "$t(\\alpha)$"]],
-        rows, groups={5: "\\multicolumn{10}{l}{\\textit{Lookahead illustrations (use future data; not results)}} \\\\"}))
+        rows, groups={
+            5: "\\multicolumn{10}{l}{\\textit{Exposure held constant (added after the results; specified in advance)}} \\\\",
+            7: "\\multicolumn{10}{l}{\\textit{Lookahead illustrations (use future data; not results)}} \\\\"}))
     pr = csv("stage5_predictive", index_col=0)
+    pr = pd.concat([pr.loc[["R1", "R2", "R1_main", "R1_nodegen"]],
+                    csv("overlay_norm_predictive", index_col=0), pr.loc[["LA_smoothed"]]])
     lab = {"R1": "R1 primary", "R2": "R2 (SPY)", "R1_main": "R1 main-sample", "R1_nodegen": "R1 excl.\\ degenerate",
-           "LA_smoothed": "R1 smoothed$^\\dagger$"}
+           "R1_norm": "R1 normalised$^\\ddagger$", "LA_smoothed": "R1 smoothed$^\\dagger$"}
     rows = [[lab[k], num(r.slope_pct), num(r.t), num(r.sharpe_hi), str(int(r.n_hi)), num(r.sharpe_lo),
              str(int(r.n_lo))] for k, r in pr.iterrows()]
     write("tab09_regime_predictive", tabular(
@@ -292,8 +308,11 @@ def tab_risk():
 def tab_dsr():
     d = csv("stage6_deflated_sharpe").iloc[0]
     e = csv("stage6_dsr_sensitivity")
-    rows = [[str(int(r.n_trials)) + (" (all configurations)" if int(r.n_trials) == int(d.n_trials) else ""),
+    rows = [[str(int(r.n_trials)) + (" (original study)" if int(r.n_trials) == int(d.n_trials) else ""),
              num(r.sr0_ann), num(r.dsr)] for r in e.itertuples()]
+    # Added 2026-10-07: the exposure-normalised overlay joins the trial set (pre-registered).
+    n26 = csv("overlay_norm_dsr", index_col=0).loc[26]
+    rows.append(["26 (including the normalised overlay)", num(n26.sr0_ann), num(n26.dsr)])
     write("tab17_dsr", tabular("lrr", [["Number of trials $N$", "SR$_0$ (annual)", "DSR"]], rows))
 
 

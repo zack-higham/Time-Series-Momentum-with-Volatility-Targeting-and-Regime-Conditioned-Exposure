@@ -19,6 +19,7 @@ STEPS = [
     ("stage4", "run_stage4.py"),               # volatility targeting, benchmarks
     ("stage5", "run_stage5.py"),               # regime overlay (about 5 minutes)
     ("stage6", "run_stage6.py"),               # evaluation, crisis, costs, robustness, DSR
+    ("overlay_norm", "run_overlay_norm.py"),   # regime overlay with exposure held constant
     ("blend", "run_blend.py"),                 # trend as a diversifier (80/20 blends)
     ("tables", "make_tables.py"),
     ("figures", "make_figures.py"),

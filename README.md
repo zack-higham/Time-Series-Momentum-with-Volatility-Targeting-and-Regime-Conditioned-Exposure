@@ -39,8 +39,11 @@ history documents that nothing was tuned to the results.
 - **The ETF implementation is the real strategy:** correlation 0.77 with the AQR futures
   TSMOM factor (beta 0.66, R² 0.60, insignificant alpha).
 - **Timing trend with a regime model does not work.** Three walk-forward Markov-switching
-  overlays lower the Sharpe ratio by 0.02 to 0.13. The model's "trending" state is a
-  low-volatility state with no forecasting power. Using full-sample smoothed probabilities
+  overlays lower the Sharpe ratio by 0.02 to 0.13. The overlay's multiplier averages 1.19, so a
+  later pre-specified check holds exposure constant: normalised by its walk-forward mean it still
+  trails V2 (0.40 vs 0.45, p = 0.33), and V3 does not beat V2 scaled by 1.19 (p = 0.32), so the
+  overlay adds leverage, not timing. The model's "trending" state is a low-volatility state with
+  no forecasting power. Using full-sample smoothed probabilities
   instead would have reported a spurious +0.12 Sharpe gain: a demonstration of how a common
   lookahead error flatters regime models.
 - **As a diversifier (pre-specified, added after the main results).** 80% 60/40 + 20% V2, rebalanced monthly:
@@ -48,7 +51,7 @@ history documents that nothing was tuned to the results.
   Sharpe 0.74 to 0.86 but not significant (bootstrap p = 0.08), and a lower mean (7.15% to 6.74%). For an
   equity-only investor (80% SPY + 20% V2): drawdown -51.8% to -42.7%, Sharpe 0.72 to 0.80 (p = 0.04, or 0.08
   after a Bonferroni adjustment for testing two blends). The 20% weight was fixed in advance, not optimised.
-- **Honest significance.** After deflating for the 25 configurations examined (Bailey and
+- **Honest significance.** After deflating for the 26 configurations examined (Bailey and
   López de Prado 2014), V2's Sharpe ratio is not significant at 5% (DSR 0.68). The evidence
   supports trend following as a crisis diversifier, not as a reliably profitable stand-alone
   strategy over this period.
@@ -105,7 +108,8 @@ time; everything downstream of `data/` is deterministic. Paper (`paper/main.tex`
 | 4 | `portfolio.py`, `run_stage4.py` | Volatility targeting (V2), benchmarks, spanning, AQR validation |
 | 5 | `regime.py`, `run_stage5.py` | Walk-forward Markov-switching overlay (V3), lookahead illustration |
 | 6 | `run_stage6.py` | Crisis windows, smile, costs and financing, robustness grid, deflated Sharpe |
-| 6b | `run_blend.py` | Trend as a diversifier: pre-registered 80/20 blends with 60/40 and SPY |
+| 6b | `run_overlay_norm.py` | Regime overlay with exposure held constant (pre-registered check) |
+| 6c | `run_blend.py` | Trend as a diversifier: pre-registered 80/20 blends with 60/40 and SPY |
 | 7 | `make_figures.py`, `make_tables.py` | Every figure and table in the paper, from saved outputs |
 
 ## References

@@ -38,8 +38,8 @@ Ten ETFs in four asset classes (equities SPY, EFA, EEM; Treasuries IEF, TLT; com
 \item \textbf{Volatility targeting is the layer that matters.} V2: Sharpe 0.45 (V1: 0.26), maximum drawdown $-26.8\%$, monthly skew turned from $-0.50$ to $+0.33$; the gain over V1 is not significant (bootstrap $p = 0.19$). Correlation 0.77 with the AQR futures TSMOM factor validates the ETF implementation.
 \item \textbf{Crisis performance.} V2 gained 9.2\%, 12.6\% and 30.6\% in the three largest equity drawdowns (2008 to 2009, 2020, 2022) while SPY fell 51.8\%, 33.8\% and 25.3\%.
 \item \textbf{As a diversifier (pre-specified 80/20 blend).} Adding 20\% V2 to a 60/40 portfolio cut its maximum drawdown from $-32.3\%$ to $-25.3\%$ and its loss in all six equity crisis windows (2022: $-21.6\%$ to $-12.6\%$), at a lower mean. Sharpe rose from 0.74 to 0.86, not significant ($p = 0.08$).
-\item \textbf{Regime timing fails out of sample.} The walk-forward overlay lowers the Sharpe ratio to 0.39; the same overlay with full-sample smoothed probabilities would have shown a spurious 0.57, an illustration of lookahead bias.
-\item \textbf{Honest significance.} Deflated for the 25 configurations examined, V2's Sharpe ratio is not significant (DSR 0.68).
+\item \textbf{Regime timing fails out of sample.} The walk-forward overlay lowers the Sharpe ratio to 0.39, and normalised to hold V2's average exposure it still trails V2 (0.40, $p = 0.33$); the same overlay with full-sample smoothed probabilities would have shown a spurious 0.57, an illustration of lookahead bias.
+\item \textbf{Honest significance.} Deflated for the 26 configurations examined, V2's Sharpe ratio is not significant (DSR 0.68).
 \end{enumerate}
 
 \begin{center}
