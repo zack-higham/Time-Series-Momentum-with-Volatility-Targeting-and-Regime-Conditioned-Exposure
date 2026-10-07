@@ -5,7 +5,7 @@ SPY's 0.72, so its value is as a diversifier: it gained in the three largest equ
 allocation beside a 60/40 portfolio cut the maximum drawdown from -32.3% to -25.3% (the Sharpe gain is not significant).**
 
 - **One-page summary:** [SUMMARY.pdf](SUMMARY.pdf)
-- **Full paper (27 pages):** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf) (LaTeX source: [`paper/main.tex`](paper/main.tex))
+- **Full paper (28 pages):** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf) (LaTeX source: [`paper/main.tex`](paper/main.tex))
 
 ![60/40 against 80% 60/40 + 20% trend: growth and drawdowns](paper/figures/fig10_blend.png)
 
@@ -109,7 +109,8 @@ time; everything downstream of `data/` is deterministic. Paper (`paper/main.tex`
 | 5 | `regime.py`, `run_stage5.py` | Walk-forward Markov-switching overlay (V3), lookahead illustration |
 | 6 | `run_stage6.py` | Crisis windows, smile, costs and financing, robustness grid, deflated Sharpe |
 | 6b | `run_overlay_norm.py` | Regime overlay with exposure held constant (pre-registered check) |
-| 6c | `run_blend.py` | Trend as a diversifier: pre-registered 80/20 blends with 60/40 and SPY |
+| 6c | `variance_ratio.py` | Daily versus monthly equity volatility (pre-registered check) |
+| 6d | `run_blend.py` | Trend as a diversifier: pre-registered 80/20 blends with 60/40 and SPY |
 | 7 | `make_figures.py`, `make_tables.py` | Every figure and table in the paper, from saved outputs |
 
 ## References

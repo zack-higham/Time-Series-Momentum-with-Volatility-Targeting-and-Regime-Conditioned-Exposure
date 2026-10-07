@@ -370,7 +370,29 @@ def tab_blend_crisis():
          ["Peak", "Trough", "60/40", "Blend", "Change", "SPY", "Blend", "Change"]], rows))
 
 
+def fn_variance_ratio():
+    """Footnote text for Section 2 (pre-registered check, 2026-10-07)."""
+    v = csv("variance_ratio", index_col=[0, 1])
+    funds = ["SPY", "EFA", "EEM"]
+
+    def vrs(w):
+        return ", ".join(f"{f} {num(v.loc[(w, f), 'vr'])}" for f in funds)
+    post = "2010-01 to 2026-09"
+    ac = ", ".join(num(v.loc[(post, f), "daily_autocorr_1"]) for f in funds)
+    text = ("Variance ratio $\\mathrm{VR} = \\operatorname{Var}(\\text{monthly})/"
+            "(21 \\times \\operatorname{Var}(\\text{daily}))$ of excess returns, which equals one when "
+            "daily returns are independent; added after the results and specified before it was "
+            f"computed. Full sample: {vrs('Full sample')}. April 2008 to December 2009 "
+            f"({int(v.loc[('2008-04 to 2009-12', 'SPY'), 'months'])} months, so imprecise): "
+            f"{vrs('2008-04 to 2009-12')}. January 2010 to September 2026: {vrs(post)}, with "
+            f"first-order autocorrelations of daily returns of {ac} in the same order.")
+    TAB_DIR.mkdir(parents=True, exist_ok=True)
+    (TAB_DIR / "fn_variance_ratio.tex").write_text(text + "\n", encoding="ascii")
+    print("wrote fn_variance_ratio")
+
+
 def main():
+    fn_variance_ratio()
     tab_blend()
     tab_blend_crisis()
     tab_dsr()
