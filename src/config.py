@@ -157,6 +157,50 @@ BLENDS = {"60/40+V2": "60/40", "SPY+V2": "SPY"}   # blend -> its benchmark
 BLEND_TREND_SERIES = "V2"
 
 
+# --- Exposure-normalised regime overlay (added 2026-10-07) --------------------
+# Added after every result above had been seen, and fixed here before any of
+# its numbers was computed. Motivation: V3 multiplies V2 by (0.5 + p_t), whose
+# mean over the sample is 1.19, so V3 changes both the LEVEL and the TIMING of
+# exposure, and V3 against V2 does not isolate timing.
+#
+# (a) "V3_norm", walk-forward normalised overlay (tradable). Weights at
+#     rebalance t are V2's times
+#         m_t = (0.5 + p_t) / (0.5 + pbar_t),
+#     where p_t is the primary R1 walk-forward filtered probability exactly as
+#     used by V3 (output/stage5_walkforward_R1.csv, degenerate refits included)
+#     and pbar_t is the mean of p_s over the rebalance dates s from the first
+#     live refit (2008-03-31, the first rebalance date) up to and including t:
+#     an expanding mean, no future data. Nothing is refitted. Dividing by the
+#     full-sample mean multiplier instead would use future information, the
+#     lookahead error the paper warns about, and is not done.
+# (b) "V2_x_const", constant-leverage diagnostic (NOT tradable). V2 weights
+#     times c, the realised mean of V3's multiplier, mean over the 222
+#     rebalance dates of (0.5 + p_t) (1.19 rounded; the unrounded value is
+#     used). It uses full-sample information and is labelled as such. V3
+#     against (b) shows whether V3 beats holding V2 at V3's average exposure.
+# Both run through the same daily engine, 10 bps costs, 222 months.
+#
+# Report: one row each in the regime table (Table 13): mean, vol, Sharpe, MDD,
+# mean gross leverage, Sharpe difference from V2 with the paired stationary
+# bootstrap p-value (BOOTSTRAP_* settings above), alpha on V2 with NW t. The
+# text also reports the bootstrap Sharpe difference of V3 against (b).
+# (a) is added to the predictive table (Table 14): V2's return in month t+1
+# regressed on m_t (slope in % per month per unit of multiplier, NW t), and
+# V2's Sharpe ratio in months with m_t > 1 and m_t <= 1.
+#
+# Interpretation rule: the conclusion that the overlay adds no timing value is
+# confirmed if (a)'s Sharpe difference from V2 is not significant at 5%
+# (p >= 0.05) OR is negative. If it is significantly positive (difference > 0
+# and p < 0.05), the timing component is reported as having value once
+# leverage is held constant, and Section 4.7 and the Conclusion are revised.
+#
+# Multiple testing: (a) is a new trend configuration, so the trial count rises
+# from 25 to 26. The deflated Sharpe table keeps its N = 25 rows unchanged and
+# adds an N = 26 row in which (a)'s Sharpe ratio joins the trial set (cross-
+# trial dispersion recomputed over the 26). (b) is a diagnostic benchmark, like
+# the lookahead illustrations, and is not counted.
+NORM_OVERLAY_FIRST_LIVE = "2008-03-31"
+
 def newey_west_lags(n_obs: int) -> int:
     """Newey-West (1994) automatic lag rule, floor(4 * (T/100)^(2/9))."""
     return int(4 * (n_obs / 100) ** (2 / 9))
