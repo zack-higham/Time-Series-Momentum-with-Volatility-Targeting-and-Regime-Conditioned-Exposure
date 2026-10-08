@@ -322,15 +322,7 @@ Appendix Table~\ref{tab:halves} splits the sample into two halves of 111 months.
 \subsection{Costs, borrowing and financing}
 \label{sec:costs}
 
-Table~\ref{tab:costs} (and Appendix Figure~\ref{fig:costs}) shows the effect of trading costs. V2 trades 9.8 times its net asset value a year, so each basis point of one-way cost costs about 0.1\% a year. Its Sharpe ratio is 0.54 before costs, 0.45 at the assumed 10 basis points and 0.10 at 50 basis points; its break-even cost is 62 basis points per unit traded, well above the cost of trading these funds. The regime overlay raises turnover to 14.2 and lowers the break-even to 47 basis points. Long-only risk parity, which trades little, overtakes V2 at costs above about 30 basis points.
-
-\begin{table}[!htbp]
-\centering
-\caption{Cost sensitivity. Annual turnover (multiples of NAV), Sharpe ratio at each one-way cost per unit of notional traded, and the linear break-even cost (annual gross mean excess return divided by annual turnover).}
-\label{tab:costs}
-\small
-\input{tables/tab12_costs}
-\end{table}
+Appendix Table~\ref{tab:costs} (and Appendix Figure~\ref{fig:costs}) shows the effect of trading costs. V2 trades 9.8 times its net asset value a year, so each basis point of one-way cost costs about 0.1\% a year. Its Sharpe ratio is 0.54 before costs, 0.45 at the assumed 10 basis points and 0.10 at 50 basis points; its break-even cost is 62 basis points per unit traded, well above the cost of trading these funds. The regime overlay raises turnover to 14.2 and lowers the break-even to 47 basis points. Long-only risk parity, which trades little, overtakes V2 at costs above about 30 basis points.
 
 Financing assumptions matter more than trading costs for an ETF implementation. V2 holds short positions averaging 0.98 times net asset value, and a borrow fee of 100 basis points a year lowers its Sharpe ratio from 0.45 to 0.36. A financing spread of 100 basis points over the bill rate on borrowed cash, which averages 0.33 times net asset value, lowers it to 0.42, and with both at 100 basis points the Sharpe ratio is 0.33.
 
@@ -554,5 +546,13 @@ Floats referred to in the main text, in the order in which they are cited.
 \caption{Sharpe ratio against one-way trading cost. The vertical line marks the 10 bps assumption.}
 \label{fig:costs}
 \end{figure}
+
+\begin{table}[!htbp]
+\centering
+\caption{Cost sensitivity. Annual turnover (multiples of NAV), Sharpe ratio at each one-way cost per unit of notional traded, and the linear break-even cost (annual gross mean excess return divided by annual turnover).}
+\label{tab:costs}
+\small
+\input{tables/tab12_costs}
+\end{table}
 
 \end{document}
