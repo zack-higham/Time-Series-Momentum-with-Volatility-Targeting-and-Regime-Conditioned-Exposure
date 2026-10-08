@@ -88,26 +88,17 @@ def plot_lines(ax, frame: pd.DataFrame, names):
 def fig_cumulative(save):
     d = out("stage6_daily_returns")
     names = ["V2", "V3", "V1", "LO_RP", "SPY", "60/40"]
-    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 4.6), sharex=True)
-    for ax, scaled in zip(axes, (False, True)):
-        series = {}
-        for n in names:
-            x = d[n].dropna()
-            if scaled:   # ex post scaling to 10% realised vol: comparison only, not tradable
-                x = x * PORTFOLIO_VOL_TARGET / (x.std() * np.sqrt(252))
-            series[n] = wealth(x)
-        frame = pd.DataFrame(series)
-        plot_lines(ax, frame, names)
-        ax.set_yscale("log")
-        ax.yaxis.set_major_locator(matplotlib.ticker.FixedLocator([0.5, 0.75, 1, 1.5, 2, 3, 4, 6]))
-        ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
-        ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
-        ax.set_ylabel("Growth of 1 (excess of T-bills, log)")
-        ax.set_title("(a) As traded" if not scaled else
-                     "(b) Each series rescaled ex post to 10% realised volatility")
-        end_labels(ax, {n: frame[n] for n in names})
-    axes[0].legend(ncol=3, loc="upper left")
-    axes[1].set_xlim(d.index[0] - pd.Timedelta(days=30), d.index[-1] + pd.Timedelta(days=30))
+    fig, ax = plt.subplots(figsize=(WIDTH, 2.9))
+    frame = pd.DataFrame({n: wealth(d[n].dropna()) for n in names})
+    plot_lines(ax, frame, names)
+    ax.set_yscale("log")
+    ax.yaxis.set_major_locator(matplotlib.ticker.FixedLocator([0.5, 0.75, 1, 1.5, 2, 3, 4, 6]))
+    ax.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v:g}"))
+    ax.yaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+    ax.set_ylabel("Growth of 1 (excess of T-bills, log)")
+    end_labels(ax, {n: frame[n] for n in names})
+    ax.legend(ncol=3, loc="upper left")
+    ax.set_xlim(d.index[0] - pd.Timedelta(days=30), d.index[-1] + pd.Timedelta(days=30))
     save(fig, "fig01_cumulative")
 
 

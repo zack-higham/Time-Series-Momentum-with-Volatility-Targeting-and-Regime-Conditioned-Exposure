@@ -10,7 +10,7 @@
 \usepackage{graphicx}
 \usepackage{caption}
 \usepackage{float}
-\usepackage[section]{placeins}
+\usepackage{placeins}
 \usepackage{setspace}
 \usepackage[authoryear,round]{natbib}
 \usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
@@ -44,14 +44,12 @@ Two refinements are standard in practice. Volatility targeting scales positions 
 
 This paper asks four questions about a TSMOM strategy built only from liquid ETFs over 2008 to 2026, a period widely regarded as difficult for trend followers. Does the strategy earn a positive risk-adjusted return? How much of its performance comes from the signal, from volatility targeting, and from a regime overlay? Does it deliver crisis alpha in the sample's equity drawdowns? And how robust is any of this to implementation choices, costs and multiple testing?
 
-The design is deliberately conservative. Every parameter (universe, sample, signal horizon, volatility estimator, risk allocation, cost assumption and regime model) was fixed in a configuration file and committed to version control before the first backtest was run, so the repository history documents that nothing was tuned to the results. The primary results are reported for these settings; alternatives appear only as labelled robustness checks. Where a decision had to be made after results were seen, it is identified as such.
-
-In brief: volatility targeting is the layer that matters, though its gain is not significant; the strategy gained in each of the three largest equity drawdowns and lowered a 60/40 portfolio's drawdowns; the regime overlay adds nothing out of sample; and after allowing for the configurations examined, the primary Sharpe ratio is not distinguishable from what selection alone could produce.
+Every parameter (universe, sample, signal horizon, volatility estimator, risk allocation, cost assumption and regime model) was committed to version control before the first backtest was run, so the repository history documents that nothing was tuned to the results. Alternatives appear only as labelled robustness checks, and any decision made after results were seen is identified as such.
 
 \section{Data}
 \label{sec:data}
 
-\textbf{Universe.} The universe is ten U.S.-listed ETFs in four asset classes: equities (SPY, S\&P 500; EFA, developed markets excluding North America; EEM, emerging markets), U.S.\ Treasuries (IEF, 7 to 10 years; TLT, 20 years and over), commodities (GLD, physical gold; DBC, a diversified commodity futures basket) and currencies (UUP, long the U.S.\ dollar against the DXY basket; FXY, long the yen; FXA, long the Australian dollar). The currency sleeve uses three differentiated exposures: the broad dollar, a safe-haven currency and a commodity-linked currency. A euro fund was rejected because the euro is about 58\% of the dollar index, making it close to a duplicate of UUP (daily correlation $-0.95$). Short-duration Treasuries were excluded because their volatility of about 1.5\% would require extreme leverage under volatility targeting, and single-commodity funds were excluded as redundant with DBC and GLD.
+\textbf{Universe.} The universe is ten U.S.-listed ETFs in four asset classes: equities (SPY, S\&P 500; EFA, developed markets excluding North America; EEM, emerging markets), U.S.\ Treasuries (IEF, 7 to 10 years; TLT, 20 years and over), commodities (GLD, physical gold; DBC, a diversified commodity futures basket) and currencies (UUP, long the U.S.\ dollar against the DXY basket; FXY, long the yen; FXA, long the Australian dollar). A euro fund was excluded as a near-duplicate of UUP (the euro is about 58\% of the dollar index; daily correlation $-0.95$), short-duration Treasuries because their volatility of about 1.5\% would need extreme leverage, and single-commodity funds as redundant with DBC and GLD.
 
 \textbf{Prices.} Daily total-return prices and every distribution and split were downloaded from Yahoo Finance from 2 January 2002 to 30 September 2026. Rebuilding total returns from closing prices and distributions reproduces the adjusted series to within 6 basis points a year, the panel has no interior gaps, and every daily move larger than 8\% (49 in all) was matched to an identifiable market event.
 
@@ -59,7 +57,7 @@ In brief: volatility targeting is the layer that matters, though its gain is not
 
 \textbf{Sample.} UUP begins trading in March 2007, so the first month-end at which all ten instruments have a twelve-month signal is 31 March 2008. The main sample is the 222 complete months from April 2008 to September 2026. Earlier data is used only for estimation warm-up and the regime model's training burn-in (Section~\ref{sec:regime_method}). The AQR Time Series Momentum factor, built from futures and forwards across the same four asset classes following MOP, is used as an external benchmark; it ends in May 2026, so comparisons with it cover 218 months.
 
-Table~\ref{tab:data} summarises the instruments. SPY has the highest Sharpe ratio (0.72). The bond funds earned little in excess of cash (1.52\% a year for TLT and 1.12\% for IEF), because the 2022 sell-off reversed much of the earlier bond rally, and the yen lost 3.87\% a year against the dollar in excess-return terms. Table~\ref{tab:corr} reports monthly correlations. Within asset classes they are high (SPY and EFA 0.87, IEF and TLT 0.92), and the three currency funds are not independent (UUP and FXA $-0.78$). The effective number of independent bets within each class, measured by the eigenvalue participation ratio of its correlation matrix, is 1.26 for equities, 1.08 for rates, 1.87 for commodities and 1.93 for currencies. This motivates the risk allocation in Section~\ref{sec:vt}.
+Table~\ref{tab:data} summarises the instruments. SPY has the highest Sharpe ratio (0.72). The bond funds earned little in excess of cash (1.52\% a year for TLT and 1.12\% for IEF), because the 2022 sell-off reversed much of the earlier bond rally, and the yen lost 3.87\% a year against the dollar in excess-return terms. Appendix Table~\ref{tab:corr} reports monthly correlations. Within asset classes they are high (SPY and EFA 0.87, IEF and TLT 0.92), and the three currency funds are not independent (UUP and FXA $-0.78$). The effective number of independent bets within each class, measured by the eigenvalue participation ratio of its correlation matrix, is 1.26 for equities, 1.08 for rates, 1.87 for commodities and 1.93 for currencies. This motivates the risk allocation in Section~\ref{sec:vt}.
 
 \begin{table}[!htbp]
 \centering
@@ -67,14 +65,6 @@ Table~\ref{tab:data} summarises the instruments. SPY has the highest Sharpe rati
 \label{tab:data}
 \small
 \input{tables/tab01_data}
-\end{table}
-
-\begin{table}[!htbp]
-\centering
-\caption{Correlations of monthly excess returns, April 2008 to September 2026.}
-\label{tab:corr}
-\small
-\input{tables/tab02_correlations}
 \end{table}
 
 \section{Methodology}
@@ -115,7 +105,7 @@ where $n_{c(i)}$ is the number of instruments in the asset class of $i$. The ris
 \begin{equation}
 w^{\mathrm{2}}_{t} = \lambda_t\, w^{\mathrm{2a}}_{t}, \qquad \lambda_t = \frac{\sigma^*}{\sqrt{ w^{\mathrm{2a}\prime}_{t}\, \Sigma_t\, w^{\mathrm{2a}}_{t}}}.
 \end{equation}
-Leverage is not capped in the primary specification, mirroring the futures literature; caps are robustness checks. The budgets fix stand-alone volatility, not risk contribution, so V2 is an inverse-volatility portfolio rather than an equal-risk-contribution portfolio, and correlated same-sign positions take more than their nominal share of risk (Table~\ref{tab:riskshares}).
+Leverage is not capped in the primary specification, mirroring the futures literature; caps are robustness checks. The budgets fix stand-alone volatility, not risk contribution, so V2 is an inverse-volatility portfolio rather than an equal-risk-contribution portfolio, and correlated same-sign positions take more than their nominal share of risk (see Section~\ref{sec:voltarg}).
 
 \textbf{Benchmarks.} Long-only risk parity (LO-RP) applies the V2 construction with every signal set to $+1$, so it isolates what TSMOM adds beyond holding the same risk-balanced, leveraged book long; \citet{huang2020} argue that much of the TSMOM premium is of this static kind. SPY and a monthly-rebalanced 60/40 portfolio of SPY and IEF are passive benchmarks, reported without costs.
 
@@ -156,20 +146,13 @@ Means are tested with Newey-West $t$-statistics using the automatic lag rule of 
 
 The code base has 42 automated tests. Those most relevant to bias are truncation tests: signals, volatilities, portfolio weights, backtest returns and walk-forward regime probabilities are recomputed after deleting all data after a cut-off date (including dates in the middle of the March 2020 crash), and every value dated before the cut-off is required to be unchanged. The engine is checked against hand-calculated cases, the targeted portfolio's ex-ante volatility against an independent covariance calculation, and the gross V1 returns against the textbook formula $N^{-1}\sum_i s_{i,t-1} r_{i,t}$, which they match exactly.
 
+\FloatBarrier
 \section{Results}
 \label{sec:results}
 
 \subsection{Predictability at the instrument level}
 
-Table~\ref{tab:predictive} reports pooled regressions of each instrument's volatility-scaled monthly excess return, $x_{i,t}/\sigma_{i,t-1}$, on its lagged signal, with standard errors clustered by month. The coefficients rise with the horizon, from $-0.001$ for the one-month signal to 0.016 for the twelve-month signal, the ordering found by MOP, but none is significant at 5\% (the twelve-month $t$-statistic is 1.66). With instrument fixed effects every $t$-statistic falls, to 1.02 for the twelve-month signal, because part of the pooled relation reflects differences in average returns across instruments rather than timing, the point made by \citet{huang2020}. MOP's lag-by-lag regressions show no more significant lags than chance would produce (Appendix Figure~\ref{fig:predictive}). A decomposition of the twelve-month sign strategy's average return into a timing component and a static component (the product of average position and average return) attributes 56\% to timing.
-
-\begin{table}[!htbp]
-\centering
-\caption{Pooled predictive regressions of the volatility-scaled monthly excess return on the lagged $k$-month signal, 2,220 instrument-months. Standard errors clustered by month.}
-\label{tab:predictive}
-\small
-\input{tables/tab03_predictive}
-\end{table}
+Appendix Table~\ref{tab:predictive} reports pooled regressions of each instrument's volatility-scaled monthly excess return, $x_{i,t}/\sigma_{i,t-1}$, on its lagged signal, with standard errors clustered by month. The coefficients rise with the horizon, from $-0.001$ for the one-month signal to 0.016 for the twelve-month signal, the ordering found by MOP, but none is significant at 5\% (the twelve-month $t$-statistic is 1.66). With instrument fixed effects every $t$-statistic falls, to 1.02 for the twelve-month signal, because part of the pooled relation reflects differences in average returns across instruments rather than timing, the point made by \citet{huang2020}. MOP's lag-by-lag regressions show no more significant lags than chance would produce (Appendix Figure~\ref{fig:predictive}). A decomposition of the twelve-month sign strategy's average return into a timing component and a static component (the product of average position and average return) attributes 56\% to timing.
 
 Weak instrument-level predictability is consistent with a shorter, later and narrower sample than MOP's: 10 instruments rather than 58, over a period that includes the long, difficult stretch for trend followers in the 2010s. Whether a diversified, risk-managed portfolio earns a reliable return is a separate question, addressed next.
 
@@ -188,7 +171,7 @@ Table~\ref{tab:perf} reports performance net of costs, and Figure~\ref{fig:cumul
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig01_cumulative.pdf}
-\caption{Growth of one unit invested in each strategy, in excess of T-bills (log scale). Panel (b) rescales each series ex post to 10\% realised volatility to compare return per unit of risk; the rescaling uses full-sample information and is not tradable.}
+\caption{Growth of one unit invested in each strategy, in excess of T-bills (log scale).}
 \label{fig:cumulative}
 \end{figure}
 
@@ -202,42 +185,14 @@ The gains are economically meaningful but statistically fragile. Table~\ref{tab:
 \input{tables/tab05_sharpe_tests}
 \end{table}
 
-Figure~\ref{fig:drawdowns} shows the drawdowns. V2's maximum drawdown of 26.8\% ran from January 2016 to February 2019 and was not recovered until April 2022: trend following can be unrewarding for years at a time. V1's drawdown, from March 2009, was not recovered until September 2022. Calendar-year returns show the familiar pattern of trend following: strong in 2008, 2010 and 2022, weak in 2009, 2016 and 2018.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\textwidth]{figures/fig02_drawdowns.pdf}
-\caption{Drawdowns of the cumulative excess return, daily.}
-\label{fig:drawdowns}
-\end{figure}
+Appendix Figure~\ref{fig:drawdowns} shows the drawdowns. V2's maximum drawdown of 26.8\% ran from January 2016 to February 2019 and was not recovered until April 2022: trend following can be unrewarding for years at a time. V1's drawdown, from March 2009, was not recovered until September 2022. Calendar-year returns show the familiar pattern of trend following: strong in 2008, 2010 and 2022, weak in 2009, 2016 and 2018.
 
 \subsection{Volatility targeting in practice}
+\label{sec:voltarg}
 
-V2 targets 10\% ex-ante volatility but realised 11.27\% (Table~\ref{tab:volval}), a bias statistic of 1.13. The forecasting error is not a code error: the ex-ante volatility of every rebalanced portfolio was verified independently. The overshoot comes from volatility jumps that a backward-looking estimator cannot anticipate, concentrated in September and October 2008, October 2014, February 2018 and March 2020. Figure~\ref{fig:vollev} shows twelve-month rolling realised volatility ranging from about 5\% to 17\%. The same overshoot appears in long-only risk parity (bias statistic 1.10), so it is a property of the risk model rather than of the trend signal.
+V2 targets 10\% ex-ante volatility but realised 11.27\%: the bias statistic is 1.13 for V2 and 1.10 for long-only risk parity, against 1.00 for V1 (Appendix Table~\ref{tab:volval}). The forecasting error is not a code error: the ex-ante volatility of every rebalanced portfolio was verified independently. The overshoot comes from volatility jumps that a backward-looking estimator cannot anticipate, concentrated in September and October 2008, October 2014, February 2018 and March 2020, and because it appears in long-only risk parity too it is a property of the risk model, not the trend signal. Twelve-month rolling realised volatility ranges from about 5\% to 17\% (Appendix Figure~\ref{fig:vollev}).
 
-\begin{table}[!htbp]
-\centering
-\caption{Accuracy of the volatility forecast. Ex-ante vol is the mean forecast at rebalance; the bias statistic is the standard deviation of monthly returns divided by the ex-ante monthly volatility. Given the kurtosis of V2's standardised returns, the standard error of its bias statistic is about 0.05. $|z|$: absolute standardised monthly return.}
-\label{tab:volval}
-\tabfit{tables/tab14_vol_validation}
-\end{table}
-
-The price of the target is leverage. V2's gross leverage averages 2.15 times net asset value; its 95th percentile is 3.38, it exceeds 3 in 12\% of months, and it peaks at 4.58 in the low-volatility spring of 2013. For futures this is unremarkable; for an ETF implementation it implies margin financing and short borrowing, whose costs are examined in Section~\ref{sec:costs}. Table~\ref{tab:riskshares} shows how the allocation changes the source of risk. Under V1, equities supply 48.5\% of ex-ante portfolio variance; under V2, each asset class supplies between 20.6\% and 32.6\%, with rates the largest because IEF and TLT usually hold same-sign positions.
-
-\begin{table}[!htbp]
-\centering
-\caption{Average share of ex-ante portfolio variance by asset class (\%). V2 per-instrument gives each instrument an equal risk budget instead of each asset class.}
-\label{tab:riskshares}
-\small
-\input{tables/tab15_risk_shares}
-\end{table}
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\textwidth]{figures/fig08_vol_leverage.pdf}
-\caption{(a) Twelve-month rolling realised volatility of V2 against the 10\% ex-ante target. (b) V2 gross leverage at each monthly rebalance.}
-\label{fig:vollev}
-\end{figure}
+The price of the target is leverage. V2's gross leverage averages 2.15 times net asset value; its 95th percentile is 3.38, it exceeds 3 in 12\% of months, and it peaks at 4.58 in the low-volatility spring of 2013. For futures this is unremarkable; for an ETF implementation it implies margin financing and short borrowing, whose costs are examined in Section~\ref{sec:costs}. Appendix Table~\ref{tab:riskshares} shows how the allocation changes the source of risk. Under V1, equities supply 48.5\% of ex-ante portfolio variance; under V2, each asset class supplies between 20.6\% and 32.6\%, with rates the largest because IEF and TLT usually hold same-sign positions.
 
 \subsection{Is it trend, static exposure, or the futures factor?}
 
@@ -259,10 +214,9 @@ Crisis windows are defined by a rule rather than chosen by eye: every peak-to-tr
 
 \begin{table}[!htbp]
 \centering
-\caption{Crisis windows: every SPY total-return drawdown deeper than 15\% from its running high, April 2008 to September 2026. SPY drawdown defines the window; the remaining columns are cumulative excess returns over T-bills from the day after the peak to the trough (\%). Lower rows: mean monthly or quarterly excess return (\%) in SPY's worst decile of months and quarters.}
+\caption{Crisis windows: every SPY total-return drawdown deeper than 15\% from its running high, April 2008 to September 2026. SPY drawdown defines the window; the remaining columns are cumulative excess returns over T-bills from the day after the peak to the trough (\%). 60/40 + V2 and SPY + V2 are the 80/20 blends of Section~\ref{sec:blend}. Lower rows: mean monthly or quarterly excess return (\%) in SPY's worst decile of months and quarters.}
 \label{tab:crisis}
-\small
-\input{tables/tab07_crisis}
+\tabfit{tables/tab07_crisis}
 \end{table}
 
 V2 was positive in the three largest drawdowns, gaining 9.2\% from May 2008 to March 2009 (SPY $-51.8\%$), 12.6\% in the February to March 2020 crash (SPY $-33.8\%$) and 30.6\% over the 2022 inflation shock (SPY $-25.3\%$). It lost in the three shorter, sharper episodes of 2011, late 2018 and early 2025, when twelve-month signals were still positioned for the preceding rally. Figure~\ref{fig:crisis} shows the daily paths. In SPY's worst decile of months, V2 averaged $+1.8\%$ against $-8.1\%$ for SPY; long-only risk parity averaged $-2.6\%$. Trend following tends to give back part of these gains in the recovery: V2 lost 5.7\% from March to August 2020 and 8.7\% between the October 2022 trough and SPY's new high in December 2023.
@@ -276,14 +230,7 @@ V2 was positive in the three largest drawdowns, gaining 9.2\% from May 2008 to M
 
 The 2020 result contradicts a common expectation, which was also my prior: that trend followers lose in fast crashes because their twelve-month signals are still long equities. An attribution of V2's return from 20 February to 23 March 2020 shows why it did not. The equity sleeve was mixed (long SPY, short EEM, with EFA switching from long to short at the end of February) and lost only 1.2\% in total, while the rest of the book was already positioned defensively: long Treasuries ($+6.6\%$), short the commodity basket ($+4.5\%$ from commodities) and long the dollar against the Australian dollar ($+2.5\%$ from currencies). Equal risk per asset class limited the damage from the one sleeve that was wrong. The same episode exposes static risk parity: on 18 March 2020 equities, Treasuries, gold and commodities fell together, and LO-RP lost 6.8\% in a day.
 
-Figure~\ref{fig:smile} plots quarterly V2 returns against quarterly SPY returns, the ``smile'' that \citet{fung2001} associate with trend followers, whose payoff resembles a long straddle. The fitted quadratic coefficient is positive (0.67) but not significant ($t = 1.20$, 74 quarters), so the convexity is visible but statistically weak in this sample.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.62\textwidth]{figures/fig07_smile.pdf}
-\caption{Quarterly V2 excess returns against quarterly SPY excess returns (74 quarters) with the fitted quadratic $r_q = a + b\,\mathrm{SPY}_q + c\,\mathrm{SPY}_q^2$; Newey-West $t$-statistic.}
-\label{fig:smile}
-\end{figure}
+Appendix Figure~\ref{fig:smile} plots quarterly V2 returns against quarterly SPY returns, the ``smile'' that \citet{fung2001} associate with trend followers, whose payoff resembles a long straddle. The fitted quadratic coefficient is positive (0.67) but not significant ($t = 1.20$, 74 quarters), so the convexity is visible but statistically weak in this sample.
 
 \subsection{Trend following as a portfolio diversifier}
 \label{sec:blend}
@@ -301,15 +248,7 @@ V2's Sharpe ratio of 0.45 is below those of SPY (0.72) and the 60/40 portfolio (
 \input{tables/tab18_blend}
 \end{table}
 
-\textbf{Results.} V2's monthly correlation with the 60/40 portfolio is $-0.11$. Adding it at 20\% lowers the 60/40 portfolio's volatility from 9.65\% to 7.81\% and its mean less, from 7.15\% to 6.74\%, so the Sharpe ratio rises from 0.74 to 0.86. The maximum drawdown falls from 32.3\% to 25.3\%. For the equity-only investor it falls from 51.8\% to 42.7\%, and the Sharpe ratio rises from 0.72 to 0.80. In each of the six crisis windows, for both investors, the blend lost less than its benchmark (Table~\ref{tab:blendcrisis}). The largest reductions came when V2 itself made money: the 60/40 investor's loss fell from 18.9\% to 12.9\% in 2020 and from 21.6\% to 12.6\% in 2022. The reductions in 2011, 2018 and 2025 were small (0.8 to 1.4 percentage points) and come mainly from holding 20\% less of the benchmark. Figure~\ref{fig:blend} shows the full paths.
-
-\begin{table}[!htbp]
-\centering
-\caption{Crisis windows (as in Table~\ref{tab:crisis}): cumulative excess return over T-bills from the day after the SPY peak to the trough (\%), for each benchmark and its 80/20 blend with V2. Change is the blend minus the benchmark in percentage points. Lower rows: mean excess return in SPY's worst decile of months and quarters.}
-\label{tab:blendcrisis}
-\small
-\input{tables/tab19_blend_crisis}
-\end{table}
+\textbf{Results.} V2's monthly correlation with the 60/40 portfolio is $-0.11$. Adding it at 20\% lowers the 60/40 portfolio's volatility from 9.65\% to 7.81\% and its mean less, from 7.15\% to 6.74\%, so the Sharpe ratio rises from 0.74 to 0.86. The maximum drawdown falls from 32.3\% to 25.3\%. For the equity-only investor it falls from 51.8\% to 42.7\%, and the Sharpe ratio rises from 0.72 to 0.80. In each of the six crisis windows, for both investors, the blend lost less than its benchmark (Table~\ref{tab:crisis}). The largest reductions came when V2 itself made money: the 60/40 investor's loss fell from 18.9\% to 12.9\% in 2020 and from 21.6\% to 12.6\% in 2022. The reductions in 2011, 2018 and 2025 were small (0.8 to 1.4 percentage points) and come mainly from holding 20\% less of the benchmark. Figure~\ref{fig:blend} shows the full paths.
 
 \begin{figure}[!htbp]
 \centering
@@ -325,7 +264,7 @@ V2's Sharpe ratio of 0.45 is below those of SPY (0.72) and the 60/40 portfolio (
 
 Table~\ref{tab:regime} evaluates the overlay. V3 lowers the Sharpe ratio from 0.45 to 0.39 ($p = 0.32$). Regressed on V2, it has a beta of 1.12 and a negative, insignificant alpha: the overlay mainly raises average exposure (its mean multiplier is 1.19) without improving its timing.
 
-\textbf{Holding exposure constant.} The comparison with V2 therefore mixes the level of exposure with its timing. Two checks, added after these results and specified before they were computed, separate the two. The first divides the multiplier by its own walk-forward average, $m_t = (0.5 + p_t)/(0.5 + \bar p_t)$, where $\bar p_t$ is the mean target-state probability from the first refit up to month $t$, so no future data enter (dividing by the full-sample mean would be a lookahead error). Its Sharpe ratio is 0.40 ($p = 0.33$ against V2), its alpha on V2 is negative, and $m_t$ does not forecast V2's returns (Table~\ref{tab:regime_pred}). The second scales V2 by the constant 1.19, a non-tradable diagnostic with V2's Sharpe ratio by construction; V3 falls 0.06 short of it ($p = 0.32$). Under the rule fixed in advance, the overlay adds no timing value. The normalised multiplier averages 0.93, because its expanding mean starts near one during the degenerate fits of 2008 to 2010, so its smaller maximum drawdown (21.5\%) reflects lower exposure, not better timing.
+\textbf{Holding exposure constant.} The comparison with V2 therefore mixes the level of exposure with its timing. Two checks, added after these results and specified before they were computed, separate the two. The first divides the multiplier by its own walk-forward average, $m_t = (0.5 + p_t)/(0.5 + \bar p_t)$, where $\bar p_t$ is the mean target-state probability from the first refit up to month $t$, so no future data enter (dividing by the full-sample mean would be a lookahead error). Its Sharpe ratio is 0.40 ($p = 0.33$ against V2), its alpha on V2 is negative, and $m_t$ does not forecast V2's returns (Table~\ref{tab:regime_pred}). The second scales V2 by the constant 1.19, a non-tradable diagnostic with V2's Sharpe ratio by construction; V3 falls 0.06 short of it ($p = 0.32$). Under the rule fixed in advance, the overlay adds no timing value. Its lower drawdown reflects lower average exposure (mean multiplier 0.93), not better timing.
 
 \begin{table}[!htbp]
 \centering
@@ -356,21 +295,13 @@ Two diagnostics explain the failure. First, in every non-degenerate refit the hi
 
 \textbf{The cost of lookahead.} The same overlay computed from full-sample smoothed probabilities would have reported a Sharpe ratio of 0.57, a gain of 0.12 over V2, a maximum drawdown of 18.7\% instead of 26.8\%, and a positive predictive slope. Full-sample parameters with filtered probabilities produce no such gain (0.43), so the spurious improvement comes from smoothing, which conditions each week's state on future observations, not from the parameter estimates. The gap of 0.18 between the smoothed and walk-forward versions measures how large this common error can be.
 
+\FloatBarrier
 \section{Robustness and Validation}
 \label{sec:robust}
 
-\subsection{Signal horizon}
+\subsection{Signal horizon and robustness grid}
 
-Figure~\ref{fig:horizons} reports V2 at each lookback. The ordering matches the literature: the one-month signal loses money (Sharpe $-0.20$) with a turnover of 28.9 times a year, and performance improves with the horizon to 0.45 at twelve months. The blend of all four horizons earns 0.43. The 95\% confidence intervals overlap heavily, so the evidence ranks the horizons only loosely; the twelve-month primary was fixed in advance and was not selected for being the best.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.62\textwidth]{figures/fig06_horizons.pdf}
-\caption{V2 Sharpe ratio by signal, net of costs, with 95\% intervals from Lo (2002) standard errors. The intervals are not independent: all variants share the same instruments and sample.}
-\label{fig:horizons}
-\end{figure}
-
-\subsection{Robustness grid}
+V2's Sharpe ratio rises with the signal horizon, as in the literature, from $-0.20$ at one month to 0.45 at twelve months, with 0.43 for the blend of all four (Appendix Figure~\ref{fig:horizons}). The 95\% intervals overlap heavily, and the twelve-month primary was fixed in advance rather than selected.
 
 Table~\ref{tab:robust} varies one element of V2 at a time. Every variant is reported and none was selected; the rows not shown here are in Appendix Table~\ref{tab:trials}. A one-day execution lag leaves the Sharpe ratio unchanged (0.45), so the results do not depend on trading at the signal close. Capping gross leverage at 2 times reduces the Sharpe ratio to 0.41 and volatility to 9.4\%. A faster volatility estimator (centre of mass 20 days) lowers the Sharpe ratio to 0.40 ($p = 0.08$) and widens rather than narrows the volatility overshoot (bias statistic 1.19), so the overshoot is not a matter of a slow estimator. A continuous signal, $\mathrm{clip}(t_{i,t}/2, -1, 1)$ where $t_{i,t}$ is the $t$-statistic of the mean daily excess return over the past twelve months \citep{baltas2013}, has the highest point estimate in the grid (0.57), but the difference from V2 is insignificant ($p = 0.22$). It was specified during the robustness analysis, before its result was computed, and it was not adopted.
 
@@ -386,20 +317,12 @@ Leaving out one asset class at a time shows where the returns come from. Removin
 
 \subsection{Subperiods}
 
-Table~\ref{tab:halves} splits the sample into two halves of 111 months. V2's Sharpe ratio is 0.38 in the first half and 0.52 in the second, positive in both and well within one standard error (0.33) of each other. The regime overlay is unstable across halves: V3 is weaker than V2 in the first half, when the degenerate fits occurred (0.27 against 0.38), and slightly stronger in the second (0.53 against 0.52). SPY's Sharpe ratio exceeds V2's in both halves.
-
-\begin{table}[!htbp]
-\centering
-\caption{Subperiod halves of 111 months each. Annualised mean excess return (\%) and Sharpe ratio with Lo (2002) standard error.}
-\label{tab:halves}
-\small
-\input{tables/tab11_subperiods}
-\end{table}
+Appendix Table~\ref{tab:halves} splits the sample into two halves of 111 months. V2's Sharpe ratio is 0.38 in the first half and 0.52 in the second, positive in both and well within one standard error (0.33) of each other. The regime overlay is unstable across halves: V3 is weaker than V2 in the first half, when the degenerate fits occurred (0.27 against 0.38), and slightly stronger in the second (0.53 against 0.52). SPY's Sharpe ratio exceeds V2's in both halves.
 
 \subsection{Costs, borrowing and financing}
 \label{sec:costs}
 
-Table~\ref{tab:costs} and Figure~\ref{fig:costs} show the effect of trading costs. V2 trades 9.8 times its net asset value a year, so each basis point of one-way cost costs about 0.1\% a year. Its Sharpe ratio is 0.54 before costs, 0.45 at the assumed 10 basis points and 0.10 at 50 basis points; its break-even cost is 62 basis points per unit traded, well above the cost of trading these funds. The regime overlay raises turnover to 14.2 and lowers the break-even to 47 basis points. Long-only risk parity, which trades little, overtakes V2 at costs above about 30 basis points.
+Table~\ref{tab:costs} (and Appendix Figure~\ref{fig:costs}) shows the effect of trading costs. V2 trades 9.8 times its net asset value a year, so each basis point of one-way cost costs about 0.1\% a year. Its Sharpe ratio is 0.54 before costs, 0.45 at the assumed 10 basis points and 0.10 at 50 basis points; its break-even cost is 62 basis points per unit traded, well above the cost of trading these funds. The regime overlay raises turnover to 14.2 and lowers the break-even to 47 basis points. Long-only risk parity, which trades little, overtakes V2 at costs above about 30 basis points.
 
 \begin{table}[!htbp]
 \centering
@@ -409,19 +332,12 @@ Table~\ref{tab:costs} and Figure~\ref{fig:costs} show the effect of trading cost
 \input{tables/tab12_costs}
 \end{table}
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.62\textwidth]{figures/fig09_costs.pdf}
-\caption{Sharpe ratio against one-way trading cost. The vertical line marks the 10 bps assumption.}
-\label{fig:costs}
-\end{figure}
-
 Financing assumptions matter more than trading costs for an ETF implementation. V2 holds short positions averaging 0.98 times net asset value, and a borrow fee of 100 basis points a year lowers its Sharpe ratio from 0.45 to 0.36. A financing spread of 100 basis points over the bill rate on borrowed cash, which averages 0.33 times net asset value, lowers it to 0.42, and with both at 100 basis points the Sharpe ratio is 0.33.
 
 \subsection{Multiple testing}
 \label{sec:dsr}
 
-Twenty-five distinct TSMOM configurations were examined in the original study: V1 at four horizons, V2a, four versions of the regime overlay and the sixteen rows of the robustness grid (the lookahead illustrations are excluded). The cross-sectional standard deviation of their Sharpe ratios is 0.17. Against this background, the probability that V2's true Sharpe ratio exceeds zero, adjusted for non-normality but not for selection, is 0.975. The deflated Sharpe ratio, which asks instead whether V2 beats the best Sharpe ratio expected from $N$ independent trials with no true skill, is 0.68 for $N = 25$ (Table~\ref{tab:dsr}). Because the configurations are highly correlated, the effective number of independent trials is well below 25; but even with $N = 2$ the deflated Sharpe ratio is 0.94, below the conventional 0.95 threshold. The exposure-normalised overlay of Section~\ref{sec:regime_results}, added later, is a twenty-sixth configuration; with it in the trial set the deflated Sharpe ratio is unchanged at 0.68. Every configuration in the trial count is listed, with its Sharpe ratio and its test against V2, in Appendix Table~\ref{tab:trials}. The primary result is therefore suggestive rather than statistically established, a conclusion consistent with the cautions of \citet{harvey2016} on backtested performance. The portfolio blends of Section~\ref{sec:blend} hold V2 unchanged, so they do not add to the count.
+Twenty-five distinct TSMOM configurations were examined in the original study: V1 at four horizons, V2a, four versions of the regime overlay and the sixteen rows of the robustness grid (the lookahead illustrations are excluded). The cross-sectional standard deviation of their Sharpe ratios is 0.17. Against this background, the probability that V2's true Sharpe ratio exceeds zero, adjusted for non-normality but not for selection, is 0.975. The deflated Sharpe ratio, which asks instead whether V2 beats the best Sharpe ratio expected from $N$ independent trials with no true skill, is 0.68 for $N = 25$ (Table~\ref{tab:dsr}). Because the configurations are highly correlated, the effective number of independent trials is well below 25, but even with $N = 2$ the deflated Sharpe ratio is 0.94, below the conventional 0.95 threshold, and adding the later exposure-normalised overlay (Section~\ref{sec:regime_results}) as a twenty-sixth configuration leaves it at 0.68. Every configuration in the trial count is listed, with its Sharpe ratio and its test against V2, in Appendix Table~\ref{tab:trials}. The primary result is therefore suggestive rather than statistically established, a conclusion consistent with the cautions of \citet{harvey2016} on backtested performance.
 
 \begin{table}[!htbp]
 \centering
@@ -431,6 +347,7 @@ Twenty-five distinct TSMOM configurations were examined in the original study: V
 \input{tables/tab17_dsr}
 \end{table}
 
+\FloatBarrier
 \section{Limitations}
 \label{sec:limitations}
 
@@ -448,7 +365,7 @@ Twenty-five distinct TSMOM configurations were examined in the original study: V
 
 \textbf{Portfolio application.} The 20\% weight is fixed, not optimised. The benchmarks are gross of costs, the blend's rebalancing is not charged, and the benefit rests on the same rate path and crises behind V2's crisis gains.
 
-\textbf{Fund mechanics, execution and data.} DBC's roll yield is already in its returns, but it rolls by an ``optimum yield'' rule and charges about 0.85\% a year. Costs are a flat 10 basis points with no market impact or capacity analysis, and trades execute at the signal close. Prices come from a free source, and the universe was chosen in 2026 from funds that still exist, so survivorship bias is limited but not zero.
+\textbf{Fund mechanics, execution and data.} DBC rolls by an ``optimum yield'' rule and charges about 0.85\% a year, costs are a flat 10 basis points with no market impact, and prices come from a free source for funds that still exist in 2026.
 
 \section{Conclusion}
 
@@ -553,6 +470,89 @@ Table~\ref{tab:trials} lists every configuration that counts towards the trial n
 \includegraphics[width=\textwidth]{figures/fig05_predictive_tstats.pdf}
 \caption{Pooled regressions of the volatility-scaled return on its own value (a) and sign (b) at lag $h$ months. Horizontal lines mark $\pm 1.96$.}
 \label{fig:predictive}
+\end{figure}
+
+\section{Supplementary tables and figures}
+\label{app:supp}
+\setcounter{table}{0}
+\setcounter{figure}{0}
+\renewcommand{\thetable}{B\arabic{table}}
+\renewcommand{\thefigure}{B\arabic{figure}}
+
+Floats referred to in the main text, in the order in which they are cited.
+
+\begin{table}[!htbp]
+\centering
+\caption{Correlations of monthly excess returns, April 2008 to September 2026.}
+\label{tab:corr}
+\small
+\input{tables/tab02_correlations}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Pooled predictive regressions of the volatility-scaled monthly excess return on the lagged $k$-month signal, 2,220 instrument-months. Standard errors clustered by month.}
+\label{tab:predictive}
+\small
+\input{tables/tab03_predictive}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig02_drawdowns.pdf}
+\caption{Drawdowns of the cumulative excess return, daily.}
+\label{fig:drawdowns}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\caption{Accuracy of the volatility forecast. Ex-ante vol is the mean forecast at rebalance; the bias statistic is the standard deviation of monthly returns divided by the ex-ante monthly volatility. Given the kurtosis of V2's standardised returns, the standard error of its bias statistic is about 0.05. $|z|$: absolute standardised monthly return.}
+\label{tab:volval}
+\tabfit{tables/tab14_vol_validation}
+\end{table}
+
+\begin{table}[!htbp]
+\centering
+\caption{Average share of ex-ante portfolio variance by asset class (\%). V2 per-instrument gives each instrument an equal risk budget instead of each asset class.}
+\label{tab:riskshares}
+\small
+\input{tables/tab15_risk_shares}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig08_vol_leverage.pdf}
+\caption{(a) Twelve-month rolling realised volatility of V2 against the 10\% ex-ante target. (b) V2 gross leverage at each monthly rebalance.}
+\label{fig:vollev}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/fig07_smile.pdf}
+\caption{Quarterly V2 excess returns against quarterly SPY excess returns (74 quarters) with the fitted quadratic $r_q = a + b\,\mathrm{SPY}_q + c\,\mathrm{SPY}_q^2$; Newey-West $t$-statistic.}
+\label{fig:smile}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/fig06_horizons.pdf}
+\caption{V2 Sharpe ratio by signal, net of costs, with 95\% intervals from Lo (2002) standard errors. The intervals are not independent: all variants share the same instruments and sample.}
+\label{fig:horizons}
+\end{figure}
+
+\begin{table}[!htbp]
+\centering
+\caption{Subperiod halves of 111 months each. Annualised mean excess return (\%) and Sharpe ratio with Lo (2002) standard error.}
+\label{tab:halves}
+\small
+\input{tables/tab11_subperiods}
+\end{table}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.62\textwidth]{figures/fig09_costs.pdf}
+\caption{Sharpe ratio against one-way trading cost. The vertical line marks the 10 bps assumption.}
+\label{fig:costs}
 \end{figure}
 
 \end{document}

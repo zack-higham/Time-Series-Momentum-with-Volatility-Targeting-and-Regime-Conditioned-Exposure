@@ -5,7 +5,7 @@ gained in the three largest equity crashes. A pre-specified 20% allocation besid
 portfolio's maximum drawdown from -32.3% to -25.3%, though the Sharpe gain is not significant.**
 
 - **One-page summary:** [SUMMARY.pdf](SUMMARY.pdf)
-- **Full paper (23 pages):** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf) (LaTeX source: [`paper/main.tex`](paper/main.tex))
+- **Full paper (22 pages):** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf) (LaTeX source: [`paper/main.tex`](paper/main.tex))
 
 ![60/40 against 80% 60/40 + 20% trend: growth and drawdowns](paper/figures/fig10_blend.png)
 

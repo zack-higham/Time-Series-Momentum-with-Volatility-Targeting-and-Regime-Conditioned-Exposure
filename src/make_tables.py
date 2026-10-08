@@ -153,25 +153,32 @@ def tab_spanning():
 
 def tab_crisis():
     w = csv("stage6_crisis_windows")
+    b = csv("blend_crisis_windows").set_index("peak")      # the 80/20 blends, same windows
+    assert list(b.index) == list(w.peak) and (b.trough.values == w.trough.values).all()
     rows = []
     for _, r in w.iterrows():
         rows.append([r.peak, r.trough, num(r.spy_dd * 100, 1), num(r.SPY, 1), num(r.V1, 1), num(r.V2, 1),
-                     num(r.V3, 1), num(r.LO_RP, 1), num(r["60/40"], 1)])
+                     num(r.V3, 1), num(r.LO_RP, 1), num(r["60/40"], 1),
+                     num(b.loc[r.peak, "60/40+V2"], 1), num(b.loc[r.peak, "SPY+V2"], 1)])
     rows.append("\\midrule")
     q = csv("stage6_worst_decile")
+    qb = csv("blend_worst_decile", index_col=[0, 1])
     for freq, lab in (("month", "SPY worst-decile months, mean"), ("quarter", "SPY worst-decile quarters, mean")):
         x = q[q.freq == freq].set_index("strategy")
         n = int(x.n_worst.iloc[0])
+        assert int(qb.loc[(freq, "60/40+V2"), "n_worst"]) == n
         rows.append([f"\\multicolumn{{3}}{{l}}{{{lab} ($n={n}$)}}", num(x.loc["SPY", "mean_worst_pct"], 1),
                      num(x.loc["V1", "mean_worst_pct"], 1), num(x.loc["V2", "mean_worst_pct"], 1),
                      num(x.loc["V3", "mean_worst_pct"], 1), num(x.loc["LO_RP", "mean_worst_pct"], 1),
-                     num(x.loc["60/40", "mean_worst_pct"], 1)])
+                     num(x.loc["60/40", "mean_worst_pct"], 1), num(qb.loc[(freq, "60/40+V2"), "mean_worst_pct"], 1),
+                     num(qb.loc[(freq, "SPY+V2"), "mean_worst_pct"], 1)])
     # The window is defined by SPY's total-return drawdown; every return column
     # (SPY included) is the excess return over T-bills across the same window.
-    body = tabular("llrrrrrrr",
-                   ["& & SPY & \\multicolumn{6}{c}{Excess return over the window (\\%)} \\\\",
-                    "\\cmidrule(lr){4-9}",
-                    ["Peak", "Trough", "drawdown", "SPY", "V1", "V2", "V3", "LO-RP", "60/40"]], rows)
+    body = tabular("llrrrrrrrrr",
+                   ["& & SPY & \\multicolumn{8}{c}{Excess return over the window (\\%)} \\\\",
+                    "\\cmidrule(lr){4-11}",
+                    ["Peak", "Trough", "drawdown", "SPY", "V1", "V2", "V3", "LO-RP", "60/40",
+                     "60/40 + V2", "SPY + V2"]], rows)
     write("tab07_crisis", body)
 
 
@@ -330,27 +337,6 @@ def tab_blend():
                       2: "\\multicolumn{13}{l}{\\textit{Secondary: equity-only investor}} \\\\"}))
 
 
-def tab_blend_crisis():
-    c = csv("blend_crisis_windows")
-    rows = [[r.peak, r.trough, num(r["60/40"], 1), num(r["60/40+V2"], 1),
-             num(r["60/40+V2"] - r["60/40"], 1, sign=True), num(r.SPY, 1), num(r["SPY+V2"], 1),
-             num(r["SPY+V2"] - r.SPY, 1, sign=True)] for _, r in c.iterrows()]
-    rows.append("\\midrule")
-    q = csv("blend_worst_decile", index_col=[0, 1])
-    for freq, lab in (("month", "SPY worst-decile months, mean"), ("quarter", "SPY worst-decile quarters, mean")):
-        x = q.loc[freq]
-        n = int(x.n_worst.iloc[0])
-        a, b = x.loc["60/40", "mean_worst_pct"], x.loc["60/40+V2", "mean_worst_pct"]
-        s, sb = x.loc["SPY", "mean_worst_pct"], x.loc["SPY+V2", "mean_worst_pct"]
-        rows.append([f"\\multicolumn{{2}}{{l}}{{{lab} ($n={n}$)}}", num(a, 1), num(b, 1), num(b - a, 1, sign=True),
-                     num(s, 1), num(sb, 1), num(sb - s, 1, sign=True)])
-    write("tab19_blend_crisis", tabular(
-        "llrrrrrr",
-        ["& & \\multicolumn{3}{c}{60/40 investor} & \\multicolumn{3}{c}{Equity-only investor} \\\\",
-         "\\cmidrule(lr){3-5} \\cmidrule(lr){6-8}",
-         ["Peak", "Trough", "60/40", "Blend", "Change", "SPY", "Blend", "Change"]], rows))
-
-
 ROB_LABEL = {"execution lag 1 day": "Execution lag 1 day", "EWMA com 20": "EWMA centre of mass 20 days",
              "EWMA com 120": "EWMA centre of mass 120 days",
              "equal risk per instrument": "Equal risk per instrument",
@@ -452,7 +438,6 @@ def main():
     tab_trials()
     tab_regime_extra()
     tab_blend()
-    tab_blend_crisis()
     tab_dsr()
     tab_risk()
     tab_data()
