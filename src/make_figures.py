@@ -27,11 +27,10 @@ WIDTH = 6.3        # inches: LaTeX text width with 1in margins on A4/letter
 # Colour follows the entity. Validated palette (light surface, all-pairs CVD-safe
 # for the four strategy hues); benchmarks in grey ink.
 COLOR = {"V2": "#2a78d6", "V1": "#eb6834", "V3": "#1baf7a", "LO_RP": "#4a3aa7",
-         "V3_R2": "#e87ba4", "SPY": "#52514e", "60/40": "#898781"}
+         "SPY": "#52514e", "60/40": "#898781"}
 STYLE = {"60/40": (0, (4, 2))}            # dashed only to separate the two greys
 LABEL = {"V1": "V1 raw TSMOM", "V2": "V2 vol-targeted", "V3": "V3 regime overlay",
-         "V3_R2": "V3-R2 SPY regime", "LO_RP": "Long-only risk parity", "SPY": "SPY",
-         "60/40": "60/40"}
+         "LO_RP": "Long-only risk parity", "SPY": "SPY", "60/40": "60/40"}
 INK, INK2, MUTED, GRID, AXIS = "#0b0b0b", "#52514e", "#898781", "#e1e0d9", "#c3c2b7"
 SHADE = "#f0efec"
 
@@ -89,7 +88,7 @@ def plot_lines(ax, frame: pd.DataFrame, names):
 def fig_cumulative(save):
     d = out("stage6_daily_returns")
     names = ["V2", "V3", "V1", "LO_RP", "SPY", "60/40"]
-    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 5.6), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 4.6), sharex=True)
     for ax, scaled in zip(axes, (False, True)):
         series = {}
         for n in names:
@@ -163,8 +162,8 @@ def fig_regimes(save):
     tp = out("stage5_weekly_trend_payoff")
     # Each probability is set at month-end t and applies to month t+1: plot as
     # a step held over the following month.
-    fig, axes = plt.subplots(3, 1, figsize=(WIDTH, 5.2), sharex=True,
-                             gridspec_kw={"height_ratios": [1, 1, 0.9]})
+    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 3.6), sharex=True,
+                             gridspec_kw={"height_ratios": [1, 0.9]})
     deg = wf.index[wf["degenerate"].astype(bool)]
     # Shade the holding month of each degenerate refit (they are not contiguous).
     # A probability set at month-end t (last trading day) is held through the
@@ -175,25 +174,18 @@ def fig_regimes(save):
     ax = axes[0]
     ax.fill_between([], [], color=SHADE, label=f"Degenerate fit ({len(deg)} months)")
     ax.step(probs.index, probs["R1"], where="post", color=COLOR["V3"], lw=1.1,
-            label="Primary (trained from 2003)")
-    ax.step(probs.index, probs["R1_main"], where="post", color=COLOR["V2"], lw=0.9,
-            label="Main-sample only (live 2011-03)")
+            label="R1 filtered probability (trained from 2003)")
     ax.set_ylabel("P(trending)")
     ax.set_ylim(-0.03, 1.03)
     ax.set_title("(a) R1: probability of the high-mean state of the trend payoff (filtered)")
-    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.13), ncol=3, fontsize=7,
+    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.13), ncol=2, fontsize=7,
               handlelength=1.5, columnspacing=1.2)
     ax = axes[1]
-    ax.step(probs.index, probs["R2"], where="post", color=COLOR["V3_R2"], lw=1.1)
-    ax.set_ylabel("P(turbulent)")
-    ax.set_ylim(-0.03, 1.03)
-    ax.set_title("(b) R2: probability of the high-variance state of SPY (filtered)")
-    ax = axes[2]
     tpm = tp.loc[probs.index[0] - pd.Timedelta(days=7):, "y"]
     rv = tpm.rolling(13).std() * np.sqrt(52)
     ax.plot(rv.index, rv, color=INK2, lw=0.9)
     ax.set_ylabel("Annualised")
-    ax.set_title("(c) Realised volatility of the weekly trend payoff (13-week rolling)")
+    ax.set_title("(b) Realised volatility of the weekly trend payoff (13-week rolling)")
     ax.set_xlim(probs.index[0], probs.index[-1] + pd.offsets.MonthEnd(1))
     fig.tight_layout(h_pad=0.8)
     save(fig, "fig04_regimes")
@@ -261,7 +253,7 @@ def fig_smile(save):
 def fig_vol_leverage(save):
     roll = out("stage4_rolling_vol")
     lev = out("stage4_leverage")
-    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 3.8), sharex=True)
+    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 3.3), sharex=True)
     ax = axes[0]
     ax.plot(roll.index, roll["V2"], color=COLOR["V2"], lw=1.2, label="V2 realised (12-month rolling)")
     ax.axhline(PORTFOLIO_VOL_TARGET * 100, color=INK, lw=0.8, label="10% ex-ante target")
@@ -308,7 +300,7 @@ def fig_blend(save):
     series = {"60/40": d["60/40"], "60/40+V2": b["60/40+V2"]}
     style = {"60/40": dict(color=COLOR["60/40"], ls=STYLE["60/40"], lw=1.1, label="60/40"),
              "60/40+V2": dict(color=blend_color, lw=1.6, label="80% 60/40 + 20% V2")}
-    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 4.6), sharex=True,
+    fig, axes = plt.subplots(2, 1, figsize=(WIDTH, 4.0), sharex=True,
                              gridspec_kw={"height_ratios": [1.4, 1]})
     for ax in axes:
         for peak in ("2008-05-19", "2020-02-19", "2022-01-03"):

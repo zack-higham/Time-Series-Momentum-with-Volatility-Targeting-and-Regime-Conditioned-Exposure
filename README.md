@@ -1,11 +1,11 @@
 # Time-Series Momentum with Volatility Targeting and Regime-Conditioned Exposure
 
-**A ten-ETF trend-following strategy (2008 to 2026) earns a Sharpe ratio of 0.45 after volatility targeting, below
-SPY's 0.72, so its value is as a diversifier: it gained in the three largest equity crashes, and a pre-specified 20%
-allocation beside a 60/40 portfolio cut the maximum drawdown from -32.3% to -25.3% (the Sharpe gain is not significant).**
+**A ten-ETF trend-following strategy (2008 to 2026) earns a Sharpe ratio of 0.45 after volatility targeting and
+gained in the three largest equity crashes. A pre-specified 20% allocation beside a 60/40 portfolio cut the
+portfolio's maximum drawdown from -32.3% to -25.3%, though the Sharpe gain is not significant.**
 
 - **One-page summary:** [SUMMARY.pdf](SUMMARY.pdf)
-- **Full paper (28 pages):** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf) (LaTeX source: [`paper/main.tex`](paper/main.tex))
+- **Full paper (24 pages):** [paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf](paper/Time_Series_Momentum_with_Volatility_Targeting_and_Regime_Conditioned_Exposure.pdf) (LaTeX source: [`paper/main.tex`](paper/main.tex))
 
 ![60/40 against 80% 60/40 + 20% trend: growth and drawdowns](paper/figures/fig10_blend.png)
 
@@ -25,7 +25,6 @@ history documents that nothing was tuned to the results.
 |---|---|---|---|---|---|
 | V1: raw TSMOM, equal notional | 1.79% | 7.0% | 0.26 (0.23) | -25.8% | -0.50 |
 | **V2: inverse-vol + 10% portfolio vol target** | **5.07%** | **11.3%** | **0.45 (0.23)** | **-26.8%** | **+0.33** |
-| V3: V2 + walk-forward regime overlay | 5.17% | 13.1% | 0.39 (0.23) | -26.3% | +0.40 |
 | Long-only risk parity (same construction, all long) | 3.19% | 11.0% | 0.29 (0.23) | -30.1% | -0.35 |
 | SPY / 60-40 (gross) | 11.18% / 7.15% | 15.6% / 9.7% | 0.72 / 0.74 | -51.8% / -32.3% | -0.58 / -0.62 |
 
@@ -38,14 +37,10 @@ history documents that nothing was tuned to the results.
   +1.8% in SPY's worst decile of months.
 - **The ETF implementation is the real strategy:** correlation 0.77 with the AQR futures
   TSMOM factor (beta 0.66, R² 0.60, insignificant alpha).
-- **Timing trend with a regime model does not work.** Three walk-forward Markov-switching
-  overlays lower the Sharpe ratio by 0.02 to 0.13. The overlay's multiplier averages 1.19, so a
-  later pre-specified check holds exposure constant: normalised by its walk-forward mean it still
-  trails V2 (0.40 vs 0.45, p = 0.33), and V3 does not beat V2 scaled by 1.19 (p = 0.32), so the
-  overlay adds leverage, not timing. The model's "trending" state is a low-volatility state with
-  no forecasting power. Using full-sample smoothed probabilities
-  instead would have reported a spurious +0.12 Sharpe gain: a demonstration of how a common
-  lookahead error flatters regime models.
+- **Timing trend with a regime model does not work.** The walk-forward Markov-switching overlay
+  lowers the Sharpe ratio from 0.45 to 0.39. Normalised to V2's average exposure it still trails V2
+  (0.40, p = 0.33), so it adds leverage, not timing. Full-sample smoothed probabilities would have
+  faked a +0.12 Sharpe gain, a common lookahead error.
 - **As a diversifier (pre-specified, added after the main results).** 80% 60/40 + 20% V2, rebalanced monthly:
   maximum drawdown -32.3% to -25.3%, smaller loss in all six equity crisis windows (2022: -21.6% to -12.6%),
   Sharpe 0.74 to 0.86 but not significant (bootstrap p = 0.08), and a lower mean (7.15% to 6.74%). For an
@@ -109,8 +104,7 @@ time; everything downstream of `data/` is deterministic. Paper (`paper/main.tex`
 | 5 | `regime.py`, `run_stage5.py` | Walk-forward Markov-switching overlay (V3), lookahead illustration |
 | 6 | `run_stage6.py` | Crisis windows, smile, costs and financing, robustness grid, deflated Sharpe |
 | 6b | `run_overlay_norm.py` | Regime overlay with exposure held constant (pre-registered check) |
-| 6c | `variance_ratio.py` | Daily versus monthly equity volatility (pre-registered check) |
-| 6d | `run_blend.py` | Trend as a diversifier: pre-registered 80/20 blends with 60/40 and SPY |
+| 6c | `run_blend.py` | Trend as a diversifier: pre-registered 80/20 blends with 60/40 and SPY |
 | 7 | `make_figures.py`, `make_tables.py` | Every figure and table in the paper, from saved outputs |
 
 ## References

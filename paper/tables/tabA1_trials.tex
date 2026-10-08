@@ -1,0 +1,37 @@
+\begin{tabular}{lrrrl}
+\toprule
+Configuration & Sharpe & $\Delta$SR vs V2 & $p$ & Also shown in \\
+\midrule
+\multicolumn{5}{l}{\textit{Signal and construction}} \\
+V1, 1-month signal & $-$0.12 & $-$0.57 & -- & -- \\
+V1, 3-month signal & 0.26 & $-$0.19 & -- & -- \\
+V1, 6-month signal & 0.20 & $-$0.25 & -- & -- \\
+V1, 12-month signal & 0.26 & $-$0.19 & 0.19 & Table~\ref{tab:perf} \\
+V2a inverse-vol & 0.36 & $-$0.09 & 0.06 & Table~\ref{tab:perf} \\
+V2 vol-targeted (primary) & 0.45 & -- & -- & Table~\ref{tab:perf} \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Regime overlay}} \\
+V3 regime (R1, primary) & 0.39 & $-$0.06 & 0.32 & Table~\ref{tab:perf} \\
+V3-R2 regime (SPY) & 0.32 & $-$0.13 & 0.21 & Table~\ref{tab:regimeextra} \\
+V3 main-sample HMM & 0.43 & $-$0.02 & 0.64 & Table~\ref{tab:regimeextra} \\
+V3 excl.\ degenerate fits & 0.42 & $-$0.03 & 0.62 & Table~\ref{tab:regimeextra} \\
+V3 normalised (walk-forward) & 0.40 & $-$0.05 & 0.33 & Table~\ref{tab:regime} \\
+\addlinespace
+\multicolumn{5}{l}{\textit{Robustness grid: V2 with one element changed}} \\
+Execution lag 1 day & 0.45 & +0.00 & 0.92 & Table~\ref{tab:robust} \\
+EWMA centre of mass 20 days & 0.40 & $-$0.05 & 0.08 & Table~\ref{tab:robust} \\
+EWMA centre of mass 120 days & 0.46 & +0.01 & 0.48 & Table~\ref{tab:robust} \\
+Equal risk per instrument & 0.45 & +0.00 & 0.99 & -- \\
+Gross leverage cap 2$\times$ & 0.41 & $-$0.04 & 0.29 & Table~\ref{tab:robust} \\
+Gross leverage cap 3$\times$ & 0.43 & $-$0.02 & 0.17 & -- \\
+Continuous $t$-statistic signal & 0.57 & +0.12 & 0.22 & Table~\ref{tab:robust} \\
+Lookback 1 month & $-$0.20 & $-$0.64 & 0.02 & Figure~\ref{fig:horizons} \\
+Lookback 3 months & 0.32 & $-$0.13 & 0.53 & Figure~\ref{fig:horizons} \\
+Lookback 6 months & 0.35 & $-$0.10 & 0.61 & Figure~\ref{fig:horizons} \\
+Blend of 1/3/6/12 months & 0.43 & $-$0.02 & 0.88 & Figure~\ref{fig:horizons} \\
+Excluding equity & 0.29 & $-$0.16 & 0.09 & Table~\ref{tab:robust} \\
+Excluding rates & 0.41 & $-$0.04 & 0.77 & Table~\ref{tab:robust} \\
+Excluding commodities & 0.34 & $-$0.11 & 0.25 & Table~\ref{tab:robust} \\
+Excluding FX & 0.50 & +0.05 & 0.52 & Table~\ref{tab:robust} \\
+\bottomrule
+\end{tabular}

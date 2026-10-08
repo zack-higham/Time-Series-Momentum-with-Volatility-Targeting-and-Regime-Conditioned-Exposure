@@ -70,11 +70,11 @@ def write(name, text):
 def tab_data():
     d = csv("data_summary", index_col=0)
     rows = [[t, d.loc[t, "class"], num(d.loc[t, "ann_excess_ret_pct"]), num(d.loc[t, "ann_vol_pct"]),
-             num(d.loc[t, "ann_vol_daily_pct"]), num(d.loc[t, "sharpe"]),
-             num(d.loc[t, "skew_monthly"]), num(d.loc[t, "worst_month_pct"], 1)] for t in d.index]
+             num(d.loc[t, "sharpe"]), num(d.loc[t, "skew_monthly"]), num(d.loc[t, "worst_month_pct"], 1)]
+            for t in d.index]
     write("tab01_data", tabular(
-        "llrrrrrr",
-        [["ETF", "Class", "Mean (\\%)", "Vol (\\%)", "Daily vol (\\%)", "Sharpe", "Skew", "Worst month (\\%)"]],
+        "llrrrrr",
+        [["ETF", "Class", "Mean (\\%)", "Vol (\\%)", "Sharpe", "Skew", "Worst month (\\%)"]],
         rows))
     c = csv("monthly_correlations", index_col=0)
     rows = [[t] + [("" if j > i else num(c.loc[t, u])) for j, u in enumerate(c.columns)]
@@ -99,31 +99,31 @@ def tab_predictive():
 
 def tab_performance():
     m = csv("stage6_core_metrics", index_col=0)
-    order = ["V1", "V2a", "V2", "V3", "V3_R2", "LO_RP", "SPY", "60/40"]
+    order = ["V1", "V2a", "V2", "V3", "LO_RP", "SPY", "60/40"]
     rows = []
     for n in order:
         r = m.loc[n]
         rows.append([SHORT.get(n, n), num(r.ann_ret_pct), num(r.ann_vol_pct), num(r.sharpe),
-                     f"({num(r.sharpe_se_lo)})", num(r.nw_t), num(r.sortino), num(r.max_dd_pct, 1),
-                     num(r.calmar), num(r.skew_d), num(r.skew_m), num(r.skew_q),
-                     num(r.turnover_yr, 1), num(r.gross_lev_mean)])
+                     f"({num(r.sharpe_se_lo)})", num(r.nw_t), num(r.max_dd_pct, 1), num(r.calmar),
+                     num(r.skew_m), num(r.turnover_yr, 1), num(r.gross_lev_mean)])
+    # Quarterly skewness is quoted in the text rather than tabulated.
+    print(f"V2 quarterly skewness: {m.loc['V2', 'skew_q']:.2f}")
     write("tab04_performance", tabular(
-        "lrrrrrrrrrrrrr",
-        [["", "Mean", "Vol", "Sharpe", "(SE)", "NW $t$", "Sortino", "MDD", "Calmar",
-          "Skew$_d$", "Skew$_m$", "Skew$_q$", "Turn.", "Lev."]],
-        rows, groups={0: "\\multicolumn{14}{l}{\\textit{Trend strategies}} \\\\",
-                      5: "\\multicolumn{14}{l}{\\textit{Benchmarks}} \\\\"}))
+        "lrrrrrrrrrr",
+        [["", "Mean", "Vol", "Sharpe", "(SE)", "NW $t$", "MDD", "Calmar", "Skew$_m$", "Turn.", "Lev."]],
+        rows, groups={0: "\\multicolumn{11}{l}{\\textit{Trend strategies}} \\\\",
+                      4: "\\multicolumn{11}{l}{\\textit{Benchmarks}} \\\\"}))
 
 
 def tab_sharpe_tests():
-    a = csv("stage4_sharpe_tests")
-    b = csv("stage5_sharpe_tests")
+    t = pd.concat([csv("stage4_sharpe_tests"), csv("stage5_sharpe_tests")]).set_index(["a", "b"])
+    pairs = [("V2", "V1"), ("V2a", "V1"), ("V2", "V2a"), ("V2", "LO_RP"), ("V3", "V2")]
     rows = []
-    for df in (a, b[b.a.isin(["V3", "V3_R2", "V3_main", "V3_nodegen"])]):
-        for _, r in df.iterrows():
-            rows.append([f"{NAME[r.a]} vs {NAME[r.b]}", num(r.sharpe_a), num(r.sharpe_b),
-                         num(r["diff"], sign=True), f"[{num(r.ci_low)}, {num(r.ci_high)}]",
-                         pval(r.p_value), num(r["corr"])])
+    for a, b in pairs:
+        r = t.loc[(a, b)]
+        rows.append([f"{NAME[a]} vs {NAME[b]}", num(r.sharpe_a), num(r.sharpe_b),
+                     num(r["diff"], sign=True), f"[{num(r.ci_low)}, {num(r.ci_high)}]",
+                     pval(r.p_value), num(r["corr"])])
     write("tab05_sharpe_tests", tabular(
         "lrrrcrr", [["Comparison", "SR$_a$", "SR$_b$", "Difference", "95\\% CI", "$p$", "Corr."]], rows))
 
@@ -131,13 +131,10 @@ def tab_sharpe_tests():
 def tab_spanning():
     s = csv("stage4_spanning")
     rows = []
-    for y in ("V1", "V2"):
-        for f in ("SPY", "60/40", "LO_RP", "SPY+LO_RP"):
-            r = s[(s.y == y) & (s.factors == f)].iloc[0]
-            b1 = r.get("beta_SPY") if f in ("SPY", "SPY+LO_RP") else r.get(f"beta_{f}")
-            b2 = r.get("beta_LO_RP") if f == "SPY+LO_RP" else np.nan
-            fname = {"LO_RP": "LO-RP", "SPY+LO_RP": "SPY + LO-RP"}.get(f, f)
-            rows.append([y, fname, num(r.alpha_ann_pct), num(r.alpha_t), num(b1), num(b2), num(r.r2)])
+    for f in ("SPY", "60/40", "LO_RP"):
+        r = s[(s.y == "V2") & (s.factors == f)].iloc[0]
+        rows.append(["V2", SHORT.get(f, f), num(r.alpha_ann_pct), num(r.alpha_t), num(r[f"beta_{f}"]),
+                     num(r.r2)])
     # External validation: V2 on the AQR TSMOM factor, aligned on calendar month.
     m = load_frame("stage6_monthly_returns", OUTPUT_DIR)
     aqr = load_frame("aqr_tsmom").loc[MAIN_START:]
@@ -147,10 +144,10 @@ def tab_spanning():
     for y in ("V1", "V2"):
         r = spanning_regression(m.loc[common, y], aqr.loc[common, ["tsmom"]])
         rows.append([y, "AQR TSMOM", num(r["alpha_ann_pct"]), num(r["alpha_t"]), num(r["beta_tsmom"]),
-                     "--", num(r["r2"])])
+                     num(r["r2"])])
     write("tab06_spanning", tabular(
-        "llrrrrr", [["Strategy", "Factors", "$\\alpha$ (\\%/yr)", "$t(\\alpha)$", "$\\beta_1$",
-                     "$\\beta_2$", "$R^2$"]], rows))
+        "llrrrr", [["Strategy", "Benchmark", "$\\alpha$ (\\%/yr)", "$t(\\alpha)$", "$\\beta$", "$R^2$"]],
+        rows))
     return {"aqr_months": len(common)}
 
 
@@ -190,8 +187,7 @@ def tab_regime():
     c = csv("overlay_norm_multipliers", index_col=0)["m_v3"].mean()   # V3's mean multiplier
     NAME["V2_x_const"] = f"V2 $\\times$ {c:.2f}$^\\ddagger$"
     rows = []
-    order = ["V2", "V3", "V3_R2", "V3_main", "V3_nodegen", "V3_norm", "V2_x_const",
-             "V3_LA_smoothed", "V3_LA_fullparams"]
+    order = ["V2", "V3", "V3_norm", "V2_x_const", "V3_LA_smoothed", "V3_LA_fullparams"]
     for n in order:
         r = p.loc[n]
         d = sd.loc[n] if n in sd.index else None
@@ -208,13 +204,11 @@ def tab_regime():
         "lrrrrrrrrr",
         [["", "Mean", "Vol", "Sharpe", "MDD", "Lev.", "$\\Delta$SR", "$p$", "$\\alpha$ on V2", "$t(\\alpha)$"]],
         rows, groups={
-            5: "\\multicolumn{10}{l}{\\textit{Exposure held constant (added after the results; specified in advance)}} \\\\",
-            7: "\\multicolumn{10}{l}{\\textit{Lookahead illustrations (use future data; not results)}} \\\\"}))
+            2: "\\multicolumn{10}{l}{\\textit{Exposure held constant (added after the results; specified in advance)}} \\\\",
+            4: "\\multicolumn{10}{l}{\\textit{Lookahead illustrations (use future data; not results)}} \\\\"}))
     pr = csv("stage5_predictive", index_col=0)
-    pr = pd.concat([pr.loc[["R1", "R2", "R1_main", "R1_nodegen"]],
-                    csv("overlay_norm_predictive", index_col=0), pr.loc[["LA_smoothed"]]])
-    lab = {"R1": "R1 primary", "R2": "R2 (SPY)", "R1_main": "R1 main-sample", "R1_nodegen": "R1 excl.\\ degenerate",
-           "R1_norm": "R1 normalised$^\\ddagger$", "LA_smoothed": "R1 smoothed$^\\dagger$"}
+    pr = pd.concat([pr.loc[["R1"]], csv("overlay_norm_predictive", index_col=0), pr.loc[["LA_smoothed"]]])
+    lab = {"R1": "R1 primary", "R1_norm": "R1 normalised$^\\ddagger$", "LA_smoothed": "R1 smoothed$^\\dagger$"}
     rows = [[lab[k], num(r.slope_pct), num(r.t), num(r.sharpe_hi), str(int(r.n_hi)), num(r.sharpe_lo),
              str(int(r.n_lo))] for k, r in pr.iterrows()]
     write("tab09_regime_predictive", tabular(
@@ -227,12 +221,8 @@ def tab_robustness():
     r = csv("stage6_robustness", index_col=0)
     label = {"primary (V2)": "Primary (V2)", "execution lag 1 day": "Execution lag 1 day",
              "EWMA com 20": "EWMA centre of mass 20 days", "EWMA com 120": "EWMA centre of mass 120 days",
-             "equal risk per instrument": "Equal risk per instrument",
              "gross leverage cap 2x": "Gross leverage cap 2$\\times$",
-             "gross leverage cap 3x": "Gross leverage cap 3$\\times$",
              "continuous t-stat signal": "Continuous $t$-statistic signal",
-             "lookback 1m": "Lookback 1 month", "lookback 3m": "Lookback 3 months",
-             "lookback 6m": "Lookback 6 months", "blend of 1/3/6/12m": "Blend of 1/3/6/12 months",
              "excluding Equity": "Excluding equity", "excluding Rates": "Excluding rates",
              "excluding Commodity": "Excluding commodities", "excluding FX": "Excluding FX"}
     rows = []
@@ -245,12 +235,12 @@ def tab_robustness():
     write("tab10_robustness", tabular(
         "lrrrrrrrr", [["Variant", "Sharpe", "$\\Delta$SR", "$p$", "Corr.", "Vol", "MDD", "Turn.", "Vol bias"]],
         rows, groups={1: "\\multicolumn{9}{l}{\\textit{Implementation and estimation}} \\\\",
-                      7: "\\multicolumn{9}{l}{\\textit{Signal}} \\\\",
-                      12: "\\multicolumn{9}{l}{\\textit{Leave one asset class out}} \\\\"}))
+                      5: "\\multicolumn{9}{l}{\\textit{Signal}} \\\\",
+                      6: "\\multicolumn{9}{l}{\\textit{Leave one asset class out}} \\\\"}))
     h = csv("stage6_subperiods")
     halves = list(dict.fromkeys(h.half))
     rows = []
-    for n in ["V1", "V2a", "V2", "V3", "V3_R2", "LO_RP", "SPY", "60/40"]:
+    for n in ["V1", "V2", "V3", "LO_RP", "SPY", "60/40"]:
         cells = [NAME[n]]
         for half in halves:
             x = h[(h.half == half) & (h.strategy == n)].iloc[0]
@@ -266,27 +256,20 @@ def tab_costs():
     c = csv("stage6_costs", index_col=0)
     levels = [0, 2, 5, 10, 20, 50]
     rows = [[NAME[n], num(c.loc[n, "turnover_yr"], 1)] + [num(c.loc[n, f"sharpe_{k}"]) for k in levels]
-            + [num(c.loc[n, "breakeven_bps"], 0)] for n in ["V1", "V2a", "V2", "V3", "V3_R2", "LO_RP"]]
+            + [num(c.loc[n, "breakeven_bps"], 0)] for n in ["V1", "V2", "V3", "LO_RP"]]
     write("tab12_costs", tabular(
         "lr" + "r" * len(levels) + "r",
         ["& & \\multicolumn{6}{c}{Sharpe ratio at one-way cost (bps)} & \\\\",
          "\\cmidrule(lr){3-8}",
          ["", "Turnover"] + [str(k) for k in levels] + ["Break-even (bps)"]], rows))
-    f = csv("stage6_fees")
-    rows = []
-    for n in ["V2", "V3", "LO_RP"]:
-        x = f[f.strategy == n]
-        get = lambda fee, b: x[(x.fee == fee) & (x.bps == b)].iloc[0].sharpe  # noqa: E731
-        rows.append([NAME[n], num(get("borrow", 0)), num(get("borrow", 50)), num(get("borrow", 100)),
-                     num(get("financing", 50)), num(get("financing", 100)), num(get("both", 100))])
-    write("tab13_fees", tabular(
-        "lrrrrrr", ["& & \\multicolumn{2}{c}{Borrow fee (bps/yr)} & \\multicolumn{2}{c}{Financing spread (bps/yr)} & Both \\\\",
-                    "\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}",
-                    ["", "None", "50", "100", "50", "100", "100"]], rows))
+    # Borrow and financing sensitivity of V2: quoted in Section 5.4 rather than tabulated.
+    x = csv("stage6_fees").query("strategy == 'V2'").set_index(["fee", "bps"]).sharpe
+    print(f"V2 Sharpe with a 100 bps borrow fee {x[('borrow', 100)]:.2f}, a 100 bps financing spread "
+          f"{x[('financing', 100)]:.2f}, both {x[('both', 100)]:.2f}")
 
 
 def tab_risk():
-    v = csv("stage4_vol_validation", index_col=0)
+    v = csv("stage4_vol_validation", index_col=0).loc[["V1", "V2", "LO_RP"]]
     rows = [[NAME[n], num(r.mean_ex_ante_pct), num(r.realised_pct), num(r.bias_stat),
              str(int(r.months_abs_z_gt_2)), str(int(r.months_abs_z_gt_3))] for n, r in v.iterrows()]
     write("tab14_vol_validation", tabular(
@@ -297,12 +280,10 @@ def tab_risk():
     rows = [[c] + [num(rc.loc[c, n] * 100, 1) for n in ("V1", "V2", "V2_inst")] for c in rc.index]
     write("tab15_risk_shares", tabular(
         "lrrr", [["Asset class", "V1", "V2", "V2 per-instrument"]], rows))
-    stats = [("Mean", lev.mean()), ("Median", lev.median()), ("5th percentile", lev.quantile(0.05)),
-             ("95th percentile", lev.quantile(0.95)), ("Maximum", lev.max())]
-    rows = [[k, num(x)] for k, x in stats] + [
-        ["Share of months above 2$\\times$", num((lev > 2).mean() * 100, 0, pct=True)],
-        ["Share of months above 3$\\times$", num((lev > 3).mean() * 100, 0, pct=True)]]
-    write("tab16_leverage", tabular("lr", [["V2 gross leverage at rebalance", "Value"]], rows))
+    # V2 gross leverage: quoted in Section 4.3 rather than tabulated.
+    print(f"V2 gross leverage: mean {lev.mean():.2f}, 95th percentile {lev.quantile(0.95):.2f}, "
+          f"maximum {lev.max():.2f} ({lev.idxmax()}), above 3x in {(lev > 3).mean() * 100:.0f}% "
+          f"of {len(lev)} rebalances")
 
 
 def tab_dsr():
@@ -370,29 +351,106 @@ def tab_blend_crisis():
          ["Peak", "Trough", "60/40", "Blend", "Change", "SPY", "Blend", "Change"]], rows))
 
 
-def fn_variance_ratio():
-    """Footnote text for Section 2 (pre-registered check, 2026-10-07)."""
-    v = csv("variance_ratio", index_col=[0, 1])
-    funds = ["SPY", "EFA", "EEM"]
+ROB_LABEL = {"execution lag 1 day": "Execution lag 1 day", "EWMA com 20": "EWMA centre of mass 20 days",
+             "EWMA com 120": "EWMA centre of mass 120 days",
+             "equal risk per instrument": "Equal risk per instrument",
+             "gross leverage cap 2x": "Gross leverage cap 2$\\times$",
+             "gross leverage cap 3x": "Gross leverage cap 3$\\times$",
+             "continuous t-stat signal": "Continuous $t$-statistic signal",
+             "lookback 1m": "Lookback 1 month", "lookback 3m": "Lookback 3 months",
+             "lookback 6m": "Lookback 6 months", "blend of 1/3/6/12m": "Blend of 1/3/6/12 months",
+             "excluding Equity": "Excluding equity", "excluding Rates": "Excluding rates",
+             "excluding Commodity": "Excluding commodities", "excluding FX": "Excluding FX"}
 
-    def vrs(w):
-        return ", ".join(f"{f} {num(v.loc[(w, f), 'vr'])}" for f in funds)
-    post = "2010-01 to 2026-09"
-    ac = ", ".join(num(v.loc[(post, f), "daily_autocorr_1"]) for f in funds)
-    text = ("Variance ratio $\\mathrm{VR} = \\operatorname{Var}(\\text{monthly})/"
-            "(21 \\times \\operatorname{Var}(\\text{daily}))$ of excess returns, which equals one when "
-            "daily returns are independent; added after the results and specified before it was "
-            f"computed. Full sample: {vrs('Full sample')}. April 2008 to December 2009 "
-            f"({int(v.loc[('2008-04 to 2009-12', 'SPY'), 'months'])} months, so imprecise): "
-            f"{vrs('2008-04 to 2009-12')}. January 2010 to September 2026: {vrs(post)}, with "
-            f"first-order autocorrelations of daily returns of {ac} in the same order.")
-    TAB_DIR.mkdir(parents=True, exist_ok=True)
-    (TAB_DIR / "fn_variance_ratio.tex").write_text(text + "\n", encoding="ascii")
-    print("wrote fn_variance_ratio")
+
+def tab_trials():
+    """Appendix Table A1: every configuration in the deflated Sharpe ratio's trial count.
+
+    Sharpe ratios are the exact inputs to the DSR (stage6_trial_sharpes.csv,
+    annualised); differences and p-values are the paired bootstrap tests already
+    run in Stages 4 to 6 and the normalised-overlay check. Nothing is recomputed.
+    """
+    ann = np.sqrt(12)
+    sr = csv("stage6_trial_sharpes", index_col=0)["sr_monthly"] * ann
+    sr["V3_norm"] = csv("overlay_norm_performance", index_col=0).loc["V3_norm", "sharpe"]
+    n_dsr = int(csv("overlay_norm_dsr", index_col=0).index.max())
+    assert len(sr) == n_dsr == 26, (len(sr), n_dsr)
+    v2 = sr["rob: primary (V2)"]
+
+    # Paired bootstrap tests, all oriented as (configuration minus V2).
+    tests = {}
+    for _, r in csv("stage4_sharpe_tests").iterrows():
+        if r.a == "V2" and r.b in ("V1", "V2a"):
+            tests[r.b] = (-r["diff"], r.p_value, r.sharpe_b)
+    for _, r in pd.concat([csv("stage5_sharpe_tests"), csv("overlay_norm_sharpe_tests")]).iterrows():
+        if r.b == "V2" and r.a in sr.index:
+            tests[r.a] = (r["diff"], r.p_value, r.sharpe_a)
+    rob = csv("stage6_robustness", index_col=0)
+    for k in ROB_LABEL:
+        tests[f"rob: {k}"] = (rob.loc[k, "diff_vs_V2"], rob.loc[k, "p_vs_V2"], rob.loc[k, "sharpe"])
+    for k, (_, _, s_test) in tests.items():     # the tested series are the DSR's series
+        assert abs(s_test - sr[k]) < 1e-6, (k, s_test, sr[k])
+
+    where = {"V1": "Table~\\ref{tab:perf}", "V2a": "Table~\\ref{tab:perf}",
+             "rob: primary (V2)": "Table~\\ref{tab:perf}", "V3": "Table~\\ref{tab:perf}",
+             "V3_norm": "Table~\\ref{tab:regime}", "V3_R2": "Table~\\ref{tab:regimeextra}",
+             "V3_main": "Table~\\ref{tab:regimeextra}", "V3_nodegen": "Table~\\ref{tab:regimeextra}"}
+    for k in ("execution lag 1 day", "EWMA com 20", "EWMA com 120", "gross leverage cap 2x",
+              "continuous t-stat signal", "excluding Equity", "excluding Rates", "excluding Commodity",
+              "excluding FX"):
+        where[f"rob: {k}"] = "Table~\\ref{tab:robust}"
+    for k in ("lookback 1m", "lookback 3m", "lookback 6m", "blend of 1/3/6/12m"):
+        where[f"rob: {k}"] = "Figure~\\ref{fig:horizons}"
+
+    label = {"V1_k1": "V1, 1-month signal", "V1_k3": "V1, 3-month signal", "V1_k6": "V1, 6-month signal",
+             "V1": "V1, 12-month signal", "V2a": "V2a inverse-vol", "rob: primary (V2)": "V2 vol-targeted (primary)",
+             "V3": "V3 regime (R1, primary)", "V3_R2": "V3-R2 regime (SPY)", "V3_main": "V3 main-sample HMM",
+             "V3_nodegen": "V3 excl.\\ degenerate fits", "V3_norm": "V3 normalised (walk-forward)"}
+    label.update({f"rob: {k}": v for k, v in ROB_LABEL.items()})
+    groups_order = [("Signal and construction", ["V1_k1", "V1_k3", "V1_k6", "V1", "V2a", "rob: primary (V2)"]),
+                    ("Regime overlay", ["V3", "V3_R2", "V3_main", "V3_nodegen", "V3_norm"]),
+                    ("Robustness grid: V2 with one element changed", [f"rob: {k}" for k in ROB_LABEL])]
+    listed = [k for _, ks in groups_order for k in ks]
+    assert sorted(listed) == sorted(sr.index), set(sr.index) ^ set(listed)
+
+    rows, groups = [], {}
+    for title, keys in groups_order:
+        groups[len(rows)] = f"\\multicolumn{{5}}{{l}}{{\\textit{{{title}}}}} \\\\"
+        for k in keys:
+            if k == "rob: primary (V2)":
+                d, p = "--", "--"
+            elif k in tests:
+                d, p = num(tests[k][0], sign=True), pval(tests[k][1])
+            else:                                  # V1 at 1/3/6 months: no paired test was run
+                d, p = num(sr[k] - v2, sign=True), "--"
+            rows.append([label[k], num(sr[k]), d, p, where.get(k, "--")])
+    write("tabA1_trials", tabular(
+        "lrrrl", [["Configuration", "Sharpe", "$\\Delta$SR vs V2", "$p$", "Also shown in"]], rows, groups))
+
+
+def tab_regime_extra():
+    """Appendix Table A2: the three regime-overlay variants not shown in the main text."""
+    p = csv("stage5_performance", index_col=0)
+    sp = csv("stage5_spanning", index_col=0)
+    pr = csv("stage5_predictive", index_col=0)
+    rows = []
+    for n, model in (("V3_R2", "R2"), ("V3_main", "R1_main"), ("V3_nodegen", "R1_nodegen")):
+        r, a, q = p.loc[n], sp.loc[n], pr.loc[model]
+        rows.append([NAME[n], num(r.ann_ret_pct), num(r.ann_vol_pct), num(r.sharpe), num(r.max_dd_pct, 1),
+                     num(r.mean_gross_lev), num(a.alpha_ann_pct), num(a.alpha_t), num(q.slope_pct), num(q.t),
+                     num(q.sharpe_hi), num(q.sharpe_lo)])
+    write("tabA2_regime_variants", tabular(
+        "lrrrrrrrrrrr",
+        ["& & & & & & \\multicolumn{2}{c}{$\\alpha$ on V2} & \\multicolumn{2}{c}{Predictive slope} "
+         "& \\multicolumn{2}{c}{V2 Sharpe} \\\\",
+         "\\cmidrule(lr){7-8}\\cmidrule(lr){9-10}\\cmidrule(lr){11-12}",
+         ["", "Mean", "Vol", "Sharpe", "MDD", "Lev.", "\\%/yr", "$t$", "Slope", "$t$",
+          "$p_t > 0.5$", "$p_t \\le 0.5$"]], rows))
 
 
 def main():
-    fn_variance_ratio()
+    tab_trials()
+    tab_regime_extra()
     tab_blend()
     tab_blend_crisis()
     tab_dsr()
